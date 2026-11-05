@@ -40,6 +40,14 @@ public class Expense {
     @OneToMany(mappedBy = "expense")
     private List<ExpenseSplit> splits = new ArrayList<>();
 
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    public void createOn() {
+        createdAt = LocalDateTime.now();
+    }
+
     public void addSplit(ExpenseSplit split) {
         if (split == null) {
             throw new IllegalArgumentException("Split cannot be null");
@@ -47,13 +55,5 @@ public class Expense {
 
         splits.add(split);
         split.setExpense(this);
-    }
-
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdOn;
-
-    @PrePersist
-    public void createOn() {
-        createdOn = LocalDateTime.now();
     }
 }
