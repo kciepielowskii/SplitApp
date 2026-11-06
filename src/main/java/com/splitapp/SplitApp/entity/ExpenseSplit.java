@@ -10,7 +10,14 @@ import lombok.Setter;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "expense_splits")
+@Table(
+        name = "expense_splits",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        columnNames = {"expense_id", "user_id"}
+                )
+        }
+)
 public class ExpenseSplit {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
