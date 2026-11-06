@@ -3,6 +3,9 @@ package com.splitapp.SplitApp.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -10,14 +13,17 @@ import java.util.List;
 
 @Entity
 @Table(name = "expense_group")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Group {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
     private Long id;
 
     @Column(nullable = false, length = 100)
     @Size(max = 100)
     @NotBlank(message = "The group name is required")
+    @Getter
     private String groupName;
 
     @Size(max = 255)
@@ -25,9 +31,11 @@ public class Group {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
+    @Getter
     private User createdBy;
 
     @OneToMany(mappedBy = "group")
+    @Getter
     private List<GroupMember> members = new ArrayList<>();
 
     @Column(nullable = false, updatable = false)
@@ -36,5 +44,10 @@ public class Group {
     @PrePersist
     public void createOn() {
         createdAt = LocalDateTime.now();
+    }
+
+    public Group(String groupName, User createdBy) {
+        this.groupName = groupName;
+        this.createdBy = createdBy;
     }
 }

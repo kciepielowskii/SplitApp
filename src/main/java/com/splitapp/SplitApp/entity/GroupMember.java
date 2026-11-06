@@ -1,6 +1,10 @@
 package com.splitapp.SplitApp.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -12,6 +16,7 @@ import java.time.LocalDateTime;
                 )
         }
 )
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class GroupMember {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,14 +24,17 @@ public class GroupMember {
 
     @ManyToOne
     @JoinColumn(name = "group_id", nullable = false)
+    @Getter
     private Group group;
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
+    @Getter
     private User user;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Getter
     private GroupRole role;
 
     @Column(nullable = false, updatable = false)
@@ -35,5 +43,11 @@ public class GroupMember {
     @PrePersist
     public void createOn() {
         joinedAt = LocalDateTime.now();
+    }
+
+    public GroupMember(Group group, User user, GroupRole role) {
+        this.group = group;
+        this.user = user;
+        this.role = role;
     }
 }
