@@ -29,7 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-public class GroupServiceTest {
+class GroupServiceTest {
     private final Validator validator =
             Validation.buildDefaultValidatorFactory().getValidator();
 
