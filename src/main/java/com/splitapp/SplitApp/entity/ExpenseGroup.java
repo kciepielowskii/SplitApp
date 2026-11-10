@@ -31,7 +31,7 @@ public class ExpenseGroup {
     private String groupDescription;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "created_by_id", nullable = false)
     @Getter
     private User createdBy;
 
