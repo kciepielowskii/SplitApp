@@ -37,7 +37,7 @@ public class Expense {
     @JoinColumn(name = "paid_by_id", nullable = false)
     private User paidBy;
 
-    @OneToMany(mappedBy = "expense")
+    @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ExpenseSplit> splits = new ArrayList<>();
 
     @Column(nullable = false, updatable = false)
