@@ -7,7 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,11 +46,11 @@ public class Expense {
     private List<ExpenseSplit> splits = new ArrayList<>();
 
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @PrePersist
     public void createOn() {
-        createdAt = LocalDateTime.now();
+        createdAt = Instant.now();
     }
 
     public Expense(BigDecimal amount, ExpenseCategory category, String description,

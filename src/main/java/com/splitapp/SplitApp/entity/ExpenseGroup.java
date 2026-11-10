@@ -7,7 +7,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,11 +40,11 @@ public class ExpenseGroup {
     private List<GroupMember> members = new ArrayList<>();
 
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @PrePersist
     public void createOn() {
-        createdAt = LocalDateTime.now();
+        createdAt = Instant.now();
     }
 
     public ExpenseGroup(String groupName, User createdBy) {
