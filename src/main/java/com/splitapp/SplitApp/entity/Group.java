@@ -29,7 +29,7 @@ public class Group {
     @Size(max = 255)
     private String groupDescription;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     @Getter
     private User createdBy;
