@@ -13,6 +13,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,17 +23,24 @@ import java.lang.reflect.Constructor;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import org.mockito.ArgumentCaptor;
 
 import java.util.Optional;
+import java.lang.reflect.Method;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+
+
 @ExtendWith(MockitoExtension.class)
 public class GroupServiceTest {
+    private final Validator validator =
+            Validation.buildDefaultValidatorFactory().getValidator();
+
     @Mock
     private GroupRepository groupRepository;
 
@@ -108,5 +117,25 @@ public class GroupServiceTest {
 
         verify(groupMemberRepository).save(captor.capture());
         assertEquals(savedGroup, captor.getValue().getGroup());
+    }
+
+    @Test
+    void shouldRejectBlankGroupName() throws Exception {
+        Method method = GroupService.class.getMethod("createGroup", String.class, Long.class);
+
+        var violations = validator.forExecutables()
+                .validateParameters(groupService, method, new Object[]{" ", 1L});
+
+        assertFalse(violations.isEmpty());
+    }
+
+    @Test
+    void shouldRejectNullUserId() throws Exception {
+        Method method = GroupService.class.getMethod("createGroup", String.class, Long.class);
+
+        var violations = validator.forExecutables()
+                .validateParameters(groupService, method, new Object[]{"Wyjazd", null});
+
+        assertFalse(violations.isEmpty());
     }
 }
