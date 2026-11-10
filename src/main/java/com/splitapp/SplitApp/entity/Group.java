@@ -27,6 +27,7 @@ public class Group {
     private String groupName;
 
     @Size(max = 255)
+    @Getter
     private String groupDescription;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -49,6 +50,11 @@ public class Group {
     public Group(String groupName, User createdBy) {
         this.groupName = groupName;
         this.createdBy = createdBy;
+    }
+
+    public Group(String groupName, String groupDescription, User createdBy) {
+        this(groupName, createdBy);
+        this.groupDescription = groupDescription;
     }
 
     public GroupMember addMember(User user, GroupRole role) {
