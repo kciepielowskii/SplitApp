@@ -2,6 +2,9 @@ package com.splitapp.SplitApp.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -10,6 +13,8 @@ import java.util.List;
 
 @Entity
 @Table(name = "expenses")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Expense {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -46,6 +51,15 @@ public class Expense {
     @PrePersist
     public void createOn() {
         createdAt = LocalDateTime.now();
+    }
+
+    public Expense(BigDecimal amount, ExpenseCategory category, String description,
+                   Group group, User paidBy) {
+        this.amount = amount;
+        this.category = category;
+        this.description = description;
+        this.group = group;
+        this.paidBy = paidBy;
     }
 
     public void addSplit(ExpenseSplit split) {

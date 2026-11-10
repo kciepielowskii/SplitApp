@@ -4,12 +4,17 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "payments")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,6 +40,16 @@ public class Payment {
 
     @Column(nullable = false)
     private LocalDateTime paidAt;
+
+    public Payment(Group group, User sender, User receiver, BigDecimal amount) {
+        if (sender == receiver) {
+            throw new IllegalArgumentException("Sender and receiver must differ");
+        }
+        this.group = group;
+        this.sender = sender;
+        this.receiver = receiver;
+        this.amount = amount;
+    }
 
     @PrePersist
     public void onCreate() {
