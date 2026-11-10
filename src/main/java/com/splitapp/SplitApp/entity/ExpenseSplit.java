@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
@@ -18,6 +20,8 @@ import java.math.BigDecimal;
                 )
         }
 )
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ExpenseSplit {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,7 +33,7 @@ public class ExpenseSplit {
     @Digits(integer = 8, fraction = 2)
     private BigDecimal amount;
 
-    @Setter
+    @Setter(AccessLevel.PACKAGE)
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "expense_id", nullable = false)
     private Expense expense;
@@ -37,4 +41,9 @@ public class ExpenseSplit {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    public ExpenseSplit(User user, BigDecimal amount) {
+        this.user = user;
+        this.amount = amount;
+    }
 }
