@@ -34,7 +34,7 @@ public class Group {
     @Getter
     private User createdBy;
 
-    @OneToMany(mappedBy = "group")
+    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true)
     @Getter
     private List<GroupMember> members = new ArrayList<>();
 
@@ -49,5 +49,11 @@ public class Group {
     public Group(String groupName, User createdBy) {
         this.groupName = groupName;
         this.createdBy = createdBy;
+    }
+
+    public GroupMember addMember(User user, GroupRole role) {
+        GroupMember member = new GroupMember(this, user, role);
+        members.add(member);
+        return member;
     }
 }
