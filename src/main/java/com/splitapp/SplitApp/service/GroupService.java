@@ -1,5 +1,6 @@
 package com.splitapp.SplitApp.service;
 
+import com.splitapp.SplitApp.dto.GroupResponse;
 import com.splitapp.SplitApp.entity.Group;
 import com.splitapp.SplitApp.entity.GroupRole;
 import com.splitapp.SplitApp.entity.User;
@@ -28,13 +29,13 @@ public class GroupService {
     }
 
     @Transactional
-    public Group createGroup(@NotBlank @Size(max = 100) String groupName,
-                             @NotNull Long userId) {
+    public GroupResponse createGroup(@NotBlank @Size(max = 100) String groupName,
+                                     @NotNull Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         Group group = new Group(groupName, user);
         group.addMember(user, GroupRole.OWNER);
-        return groupRepository.save(group);
+        return GroupResponse.from(groupRepository.save(group));
     }
 }
