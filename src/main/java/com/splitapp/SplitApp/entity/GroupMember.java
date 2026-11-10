@@ -5,7 +5,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(
@@ -38,11 +38,11 @@ public class GroupMember {
     private GroupRole role;
 
     @Column(nullable = false, updatable = false)
-    private LocalDateTime joinedAt;
+    private Instant joinedAt;
 
     @PrePersist
     public void createOn() {
-        joinedAt = LocalDateTime.now();
+        joinedAt = Instant.now();
     }
 
     public GroupMember(ExpenseGroup group, User user, GroupRole role) {

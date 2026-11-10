@@ -9,7 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "payments")
@@ -39,7 +39,7 @@ public class Payment {
     private BigDecimal amount;
 
     @Column(nullable = false)
-    private LocalDateTime paidAt;
+    private Instant paidAt;
 
     public Payment(ExpenseGroup group, User sender, User receiver, BigDecimal amount) {
         if (sender == receiver) {
@@ -54,7 +54,7 @@ public class Payment {
     @PrePersist
     public void onCreate() {
         if (paidAt == null) {
-            paidAt = LocalDateTime.now();
+            paidAt = Instant.now();
         }
     }
 }
