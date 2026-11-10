@@ -1,5 +1,6 @@
 package com.splitapp.SplitApp.service;
 
+import com.splitapp.SplitApp.dto.GroupResponse;
 import com.splitapp.SplitApp.entity.Group;
 import com.splitapp.SplitApp.entity.GroupMember;
 import com.splitapp.SplitApp.entity.GroupRole;
@@ -50,16 +51,12 @@ public class GroupServiceTest {
         when(groupRepository.save(any(Group.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        Group result = groupService.createGroup("Wyjazd", 1L);
+        GroupResponse result = groupService.createGroup("Wyjazd", 1L);
 
         assertNotNull(result);
-        assertEquals("Wyjazd", result.getGroupName());
-        assertEquals(1, result.getMembers().size());
-
-        GroupMember owner = result.getMembers().get(0);
-        assertEquals(GroupRole.OWNER, owner.getRole());
-        assertEquals(user, owner.getUser());
-        assertEquals(result, owner.getGroup());
+        assertEquals("Wyjazd", result.groupName());
+        assertEquals(1, result.members().size());
+        assertEquals(GroupRole.OWNER, result.members().get(0).role());
     }
 
     @Test
