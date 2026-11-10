@@ -22,7 +22,7 @@ public class Payment {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "group_id", nullable = false)
-    private Group group;
+    private ExpenseGroup group;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "sender_id", nullable = false)
@@ -41,7 +41,7 @@ public class Payment {
     @Column(nullable = false)
     private LocalDateTime paidAt;
 
-    public Payment(Group group, User sender, User receiver, BigDecimal amount) {
+    public Payment(ExpenseGroup group, User sender, User receiver, BigDecimal amount) {
         if (sender == receiver) {
             throw new IllegalArgumentException("Sender and receiver must differ");
         }

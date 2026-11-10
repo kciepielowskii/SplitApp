@@ -1,6 +1,6 @@
 package com.splitapp.SplitApp.dto;
 
-import com.splitapp.SplitApp.entity.Group;
+import com.splitapp.SplitApp.entity.ExpenseGroup;
 
 import java.util.List;
 
@@ -11,7 +11,7 @@ public record GroupResponse(
         Long createdById,
         List<GroupMemberResponse> members
 ) {
-    public static GroupResponse from(Group group) {
+    public static GroupResponse from(ExpenseGroup group) {
         return new GroupResponse(
                 group.getId(),
                 group.getGroupName(),
