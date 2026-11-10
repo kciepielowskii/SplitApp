@@ -10,8 +10,13 @@ import com.splitapp.SplitApp.repository.GroupMemberRepository;
 import com.splitapp.SplitApp.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 @Service
+@Validated
 public class GroupService {
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -28,7 +33,8 @@ public class GroupService {
     }
 
     @Transactional
-    public Group createGroup(String groupName, Long userId) {
+    public Group createGroup(@NotBlank @Size(max = 100) String groupName,
+                             @NotNull Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
