@@ -1,8 +1,7 @@
 package com.splitapp.SplitApp.service;
 
 import com.splitapp.SplitApp.dto.GroupResponse;
-import com.splitapp.SplitApp.entity.Group;
-import com.splitapp.SplitApp.entity.GroupMember;
+import com.splitapp.SplitApp.entity.ExpenseGroup;
 import com.splitapp.SplitApp.entity.GroupRole;
 import com.splitapp.SplitApp.entity.User;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
@@ -48,7 +47,7 @@ public class GroupServiceTest {
         User user = createUser();
         when(userRepository.findById(1L))
                 .thenReturn(Optional.of(user));
-        when(groupRepository.save(any(Group.class)))
+        when(groupRepository.save(any(ExpenseGroup.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         GroupResponse result = groupService.createGroup("Wyjazd", 1L);
@@ -66,7 +65,7 @@ public class GroupServiceTest {
 
         assertThrows(UserNotFoundException.class,
                 () -> groupService.createGroup("Wyjazd", 1L));
-        verify(groupRepository, never()).save(any(Group.class));
+        verify(groupRepository, never()).save(any(ExpenseGroup.class));
     }
 
     @Test

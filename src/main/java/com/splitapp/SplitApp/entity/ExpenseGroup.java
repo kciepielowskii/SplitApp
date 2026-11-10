@@ -14,7 +14,7 @@ import java.util.List;
 @Entity
 @Table(name = "expense_group")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Group {
+public class ExpenseGroup {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Getter
@@ -47,12 +47,12 @@ public class Group {
         createdAt = LocalDateTime.now();
     }
 
-    public Group(String groupName, User createdBy) {
+    public ExpenseGroup(String groupName, User createdBy) {
         this.groupName = groupName;
         this.createdBy = createdBy;
     }
 
-    public Group(String groupName, String groupDescription, User createdBy) {
+    public ExpenseGroup(String groupName, String groupDescription, User createdBy) {
         this(groupName, createdBy);
         this.groupDescription = groupDescription;
     }

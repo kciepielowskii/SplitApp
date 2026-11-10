@@ -36,7 +36,7 @@ public class Expense {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "group_id", nullable = false)
-    private Group group;
+    private ExpenseGroup group;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "paid_by_id", nullable = false)
@@ -54,7 +54,7 @@ public class Expense {
     }
 
     public Expense(BigDecimal amount, ExpenseCategory category, String description,
-                   Group group, User paidBy) {
+                   ExpenseGroup group, User paidBy) {
         this.amount = amount;
         this.category = category;
         this.description = description;

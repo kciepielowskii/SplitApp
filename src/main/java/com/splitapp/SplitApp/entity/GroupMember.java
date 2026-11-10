@@ -25,7 +25,7 @@ public class GroupMember {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "group_id", nullable = false)
     @Getter
-    private Group group;
+    private ExpenseGroup group;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
@@ -45,7 +45,7 @@ public class GroupMember {
         joinedAt = LocalDateTime.now();
     }
 
-    public GroupMember(Group group, User user, GroupRole role) {
+    public GroupMember(ExpenseGroup group, User user, GroupRole role) {
         this.group = group;
         this.user = user;
         this.role = role;
