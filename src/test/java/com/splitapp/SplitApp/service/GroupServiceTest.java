@@ -63,8 +63,10 @@ class GroupServiceTest {
         when(userRepository.findById(1L))
                 .thenReturn(Optional.empty());
 
-        assertThrows(UserNotFoundException.class,
+        UserNotFoundException ex = assertThrows(UserNotFoundException.class,
                 () -> groupService.createGroup("Wyjazd", 1L));
+
+        assertEquals("User not found", ex.getMessage());
         verify(groupRepository, never()).save(any(ExpenseGroup.class));
     }
 

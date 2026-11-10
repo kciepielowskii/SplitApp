@@ -7,26 +7,20 @@ import com.splitapp.SplitApp.entity.User;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.repository.GroupRepository;
 import com.splitapp.SplitApp.repository.UserRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.validation.annotation.Validated;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 
 @Service
 @Validated
+@RequiredArgsConstructor
 public class GroupService {
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
-
-    public GroupService(
-            GroupRepository groupRepository,
-            UserRepository userRepository
-    ) {
-        this.groupRepository = groupRepository;
-        this.userRepository = userRepository;
-    }
 
     @Transactional
     public GroupResponse createGroup(@NotBlank @Size(max = 100) String groupName,

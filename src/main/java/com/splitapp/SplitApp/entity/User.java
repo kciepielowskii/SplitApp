@@ -43,6 +43,7 @@ public class User {
     @Column(nullable = false, unique = true)
     @Email(message = "Invalid email address format")
     @NotBlank(message = "Email is required")
+    @Size(max = 255)
     @Getter
     @Setter
     private String email;
