@@ -7,6 +7,7 @@ import com.splitapp.SplitApp.service.GroupService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -32,5 +33,10 @@ public class GroupController {
     public GroupResponse addMember(@PathVariable Long groupId,
                                    @Valid @RequestBody AddMemberRequest request) {
         return groupService.addMember(groupId, request.userId());
+    }
+
+    @GetMapping("/{groupId}")
+    public GroupResponse getGroup(@PathVariable Long groupId) {
+        return groupService.getGroup(groupId);
     }
 }
