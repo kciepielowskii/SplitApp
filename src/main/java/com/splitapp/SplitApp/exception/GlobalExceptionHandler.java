@@ -92,7 +92,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     private ProblemDetail validationProblem(Map<String, String> errors) {
-        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "Request validation failed");
         problem.setTitle("Validation failed");
         problem.setProperty("errors", errors);
         return problem;

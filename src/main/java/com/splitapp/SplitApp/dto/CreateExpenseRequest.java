@@ -15,5 +15,9 @@ public record CreateExpenseRequest(
         @NotNull ExpenseCategory category,
         @Size(max = 255) String description,
         @NotNull Long paidById,
-        @NotEmpty List<@NotNull Long> participantIds) {
+        @NotEmpty @Size(max = 100) List<@NotNull Long> participantIds) {
+
+    public CreateExpenseRequest {
+        description = description == null || description.isBlank() ? null : description.trim();
+    }
 }

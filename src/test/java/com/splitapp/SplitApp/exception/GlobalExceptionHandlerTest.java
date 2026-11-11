@@ -47,6 +47,7 @@ class GlobalExceptionHandlerTest {
         assertEquals("Validation failed", result.getTitle());
         Map<?, ?> errors = (Map<?, ?>) result.getProperties().get("errors");
         assertTrue(errors.containsKey("email"));
+        assertEquals("Request validation failed", result.getDetail());
     }
 
     @Test

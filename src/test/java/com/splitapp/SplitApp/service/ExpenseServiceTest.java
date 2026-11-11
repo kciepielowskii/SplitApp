@@ -169,4 +169,15 @@ class ExpenseServiceTest {
         ReflectionTestUtils.setField(group, "id", GROUP_ID);
         return group;
     }
+
+    @Test
+    void shouldReportMissingParticipantBeforeAmountProblems() {
+        User u1 = user(1L);
+        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1)));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(u1));
+        when(userRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(u1));
+
+        assertThrows(UserNotFoundException.class,
+                () -> expenseService.createExpense(GROUP_ID, request("0.01", 1L, List.of(1L, 2L))));
+    }
 }

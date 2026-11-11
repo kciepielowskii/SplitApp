@@ -52,6 +52,9 @@ public class ExpenseService {
 
         Map<Long, User> participants = userRepository.findAllById(participantIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
+        if (!participants.keySet().containsAll(participantIds)) {
+            throw new UserNotFoundException("User not found");
+        }
 
         List<BigDecimal> shares;
         try {
@@ -64,9 +67,6 @@ public class ExpenseService {
         Expense expense = new Expense(amount, request.category(), request.description(), group, payer);
         for (int i = 0; i < participantIds.size(); i++) {
             User participant = participants.get(participantIds.get(i));
-            if (participant == null) {
-                throw new UserNotFoundException("User not found");
-            }
             requireMember(group, participant, "Participant is not a member of this group");
             expense.addSplit(new ExpenseSplit(participant, shares.get(i)));
         }
