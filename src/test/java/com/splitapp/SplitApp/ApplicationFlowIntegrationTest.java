@@ -717,6 +717,136 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.members.length()").value(2));
     }
 
+    @Test
+    void shouldTransferOwnershipAndSwitchPrivileges() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        TestUser outsider = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        String ownerUrl = "/groups/%d/owner".formatted(groupId);
+
+        send(owner, ownerUrl, """
+                {"userId":%d}
+                """.formatted(owner.id()))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value("You are already the owner of this group"));
+        send(owner, ownerUrl, """
+                {"userId":%d}
+                """.formatted(outsider.id()))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail")
+                        .value("The new owner must be a member of this group"));
+        send(friend, ownerUrl, """
+                {"userId":%d}
+                """.formatted(friend.id()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail")
+                        .value("Only the group owner can transfer ownership"));
+
+        send(owner, ownerUrl, """
+                {"userId":%d}
+                """.formatted(friend.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members[0].userId").value(owner.id()))
+                .andExpect(jsonPath("$.members[0].role").value("MEMBER"))
+                .andExpect(jsonPath("$.members[1].userId").value(friend.id()))
+                .andExpect(jsonPath("$.members[1].role").value("OWNER"));
+
+        send(owner, "/groups/%d/invitations".formatted(groupId), """
+                {"email":"%s"}
+                """.formatted(outsider.email()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("Only the group owner can invite members"));
+        invite(groupId, friend, outsider.email());
+    }
+
+    @Test
+    void shouldLetMemberLeaveOnlyAfterSettlingUp() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        createSharedExpense(groupId, owner, friend, "10.00");
+        String leaveUrl = "/groups/%d/leave".formatted(groupId);
+
+        send(friend, leaveUrl, "")
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail")
+                        .value("Settle your balance before leaving the group"));
+
+        long paymentId = createPayment(groupId, friend, owner, "5.00");
+        send(friend, leaveUrl, "")
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value("You have pending payments in this group; "
+                        + "wait until they are confirmed or delete them"));
+
+        send(owner, "/groups/%d/payments/%d/confirm".formatted(groupId, paymentId), "")
+                .andExpect(status().isOk());
+        send(friend, leaveUrl, "").andExpect(status().isNoContent());
+
+        fetch(friend, "/groups/%d".formatted(groupId)).andExpect(status().isForbidden());
+        fetch(owner, "/groups/%d".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members.length()").value(1));
+        // the history stays
+        fetch(owner, "/groups/%d/expenses".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        // a former member can be invited again
+        addMember(groupId, owner, friend);
+        fetch(friend, "/groups/%d".formatted(groupId)).andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldNotLetTheOwnerLeaveUntilOwnershipIsTransferred() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        String leaveUrl = "/groups/%d/leave".formatted(groupId);
+        String ownerMessage = "The group owner cannot leave; "
+                + "transfer ownership to another member first";
+
+        send(owner, leaveUrl, "")
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value(ownerMessage));
+
+        send(owner, "/groups/%d/owner".formatted(groupId), """
+                {"userId":%d}
+                """.formatted(friend.id()))
+                .andExpect(status().isOk());
+        send(owner, leaveUrl, "").andExpect(status().isNoContent());
+
+        fetch(friend, "/groups/%d".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members.length()").value(1))
+                .andExpect(jsonPath("$.members[0].role").value("OWNER"));
+        // the new owner is now alone and cannot leave either
+        send(friend, leaveUrl, "")
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value(ownerMessage));
+    }
+
+    @Test
+    void shouldReturn403OrNotFoundWhenOutsiderChangesMembership() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser outsider = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+
+        send(outsider, "/groups/%d/leave".formatted(groupId), "")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"));
+        send(outsider, "/groups/%d/owner".formatted(groupId), """
+                {"userId":%d}
+                """.formatted(outsider.id()))
+                .andExpect(status().isForbidden());
+        send(outsider, "/groups/999999/leave", "")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
     private record TestUser(long id, String email) {
     }
 

@@ -35,6 +35,13 @@ class ExpenseGroupTest {
         return user;
     }
 
+    private ExpenseGroup groupWithOwnerAndMember() {
+        ExpenseGroup group = new ExpenseGroup("Wyjazd", creator);
+        group.addMember(user(1L), GroupRole.OWNER);
+        group.addMember(user(2L), GroupRole.MEMBER);
+        return group;
+    }
+
     @Test
     void shouldAddMember() {
         ExpenseGroup group = new ExpenseGroup("Wyjazd", creator);
@@ -91,5 +98,70 @@ class ExpenseGroupTest {
 
         assertFalse(group.isOwner(2L));
         assertFalse(group.isOwner(3L));
+    }
+
+    @Test
+    void shouldRecognizeMembersById() {
+        ExpenseGroup group = groupWithOwnerAndMember();
+
+        assertTrue(group.isMember(1L));
+        assertTrue(group.isMember(2L));
+        assertFalse(group.isMember(3L));
+    }
+
+    @Test
+    void shouldRemoveMember() {
+        ExpenseGroup group = groupWithOwnerAndMember();
+
+        group.removeMember(2L);
+
+        assertEquals(1, group.getMembers().size());
+        assertFalse(group.isMember(2L));
+        assertTrue(group.isMember(1L));
+    }
+
+    @Test
+    void shouldRejectRemovingSomeoneWhoIsNotMember() {
+        ExpenseGroup group = groupWithOwnerAndMember();
+
+        assertThrows(IllegalArgumentException.class, () -> group.removeMember(3L));
+        assertEquals(2, group.getMembers().size());
+    }
+
+    @Test
+    void shouldTransferOwnership() {
+        ExpenseGroup group = groupWithOwnerAndMember();
+
+        group.transferOwnership(1L, 2L);
+
+        assertFalse(group.isOwner(1L));
+        assertTrue(group.isOwner(2L));
+        assertEquals(GroupRole.MEMBER, group.getMembers().get(0).getRole());
+        assertEquals(GroupRole.OWNER, group.getMembers().get(1).getRole());
+    }
+
+    @Test
+    void shouldRejectTransferringOwnershipToNonMember() {
+        ExpenseGroup group = groupWithOwnerAndMember();
+
+        assertThrows(IllegalArgumentException.class, () -> group.transferOwnership(1L, 3L));
+        assertTrue(group.isOwner(1L));
+    }
+
+    @Test
+    void shouldRejectTransferringOwnershipToTheSameUser() {
+        ExpenseGroup group = groupWithOwnerAndMember();
+
+        assertThrows(IllegalArgumentException.class, () -> group.transferOwnership(1L, 1L));
+        assertTrue(group.isOwner(1L));
+    }
+
+    @Test
+    void shouldRejectTransferringOwnershipByNonOwner() {
+        ExpenseGroup group = groupWithOwnerAndMember();
+
+        assertThrows(IllegalArgumentException.class, () -> group.transferOwnership(2L, 1L));
+        assertTrue(group.isOwner(1L));
+        assertFalse(group.isOwner(2L));
     }
 }

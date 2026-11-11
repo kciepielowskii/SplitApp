@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Entity
 @Table(name = "expense_group")
@@ -76,6 +77,10 @@ public class ExpenseGroup {
                 .anyMatch(member -> User.sameUser(member.getUser(), user));
     }
 
+    public boolean isMember(Long userId) {
+        return findMember(userId).isPresent();
+    }
+
     public boolean isOwner(Long userId) {
         return members.stream()
                 .anyMatch(member -> member.getRole() == GroupRole.OWNER
@@ -95,7 +100,37 @@ public class ExpenseGroup {
         return member;
     }
 
+    public void removeMember(Long userId) {
+        GroupMember member = findMember(userId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "User is not a member of this group"));
+        members.remove(member);
+    }
+
+    /** The current owner becomes a regular member and the new owner takes over. */
+    public void transferOwnership(Long currentOwnerId, Long newOwnerId) {
+        GroupMember currentOwner = findMember(currentOwnerId)
+                .filter(member -> member.getRole() == GroupRole.OWNER)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "The current owner is not an owner of this group"));
+        GroupMember newOwner = findMember(newOwnerId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "The new owner is not a member of this group"));
+        if (currentOwner == newOwner) {
+            throw new IllegalArgumentException("The group already belongs to this user");
+        }
+
+        currentOwner.changeRole(GroupRole.MEMBER);
+        newOwner.changeRole(GroupRole.OWNER);
+    }
+
     public List<GroupMember> getMembers() {
         return Collections.unmodifiableList(members);
+    }
+
+    private Optional<GroupMember> findMember(Long userId) {
+        return members.stream()
+                .filter(member -> Objects.equals(member.getUser().getId(), userId))
+                .findFirst();
     }
 }
