@@ -62,6 +62,7 @@ class MembershipServiceTest {
         GroupResponse result = membershipService.transferOwnership(GROUP_ID, 1L, 2L);
 
         verify(groupAccess).requireMemberAndLock(GROUP_ID, 1L);
+        verify(groupRepository).flush();
         assertEquals(GroupRole.MEMBER, result.members().get(0).role());
         assertEquals(GroupRole.OWNER, result.members().get(1).role());
     }

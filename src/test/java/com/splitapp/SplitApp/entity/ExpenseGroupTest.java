@@ -141,6 +141,18 @@ class ExpenseGroupTest {
     }
 
     @Test
+    void shouldDemoteTheOldOwnerBeforeThePromotionStarts() {
+        ExpenseGroup group = groupWithOwnerAndMember();
+
+        group.transferOwnership(1L, 2L, () -> {
+            assertFalse(group.isOwner(1L));
+            assertFalse(group.isOwner(2L));
+        });
+
+        assertTrue(group.isOwner(2L));
+    }
+
+    @Test
     void shouldRejectTransferringOwnershipToNonMember() {
         ExpenseGroup group = groupWithOwnerAndMember();
 
