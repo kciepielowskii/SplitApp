@@ -17,8 +17,10 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Objects;
 
 @Entity
 @Table(name = "payments")
@@ -51,13 +53,15 @@ public class Payment {
     private Instant paidAt;
 
     public Payment(ExpenseGroup group, User sender, User receiver, BigDecimal amount) {
-        if (sender == receiver) {
+        this.group = Objects.requireNonNull(group, "Group is required");
+        this.sender = Objects.requireNonNull(sender, "Sender is required");
+        this.receiver = Objects.requireNonNull(receiver, "Receiver is required");
+        this.amount = Objects.requireNonNull(amount, "Amount is required");
+
+        if (sender == receiver
+                || (sender.getId() != null && sender.getId().equals(receiver.getId()))) {
             throw new IllegalArgumentException("Sender and receiver must differ");
         }
-        this.group = group;
-        this.sender = sender;
-        this.receiver = receiver;
-        this.amount = amount;
     }
 
     @PrePersist
