@@ -40,7 +40,7 @@ public class InvitationService {
     @Transactional
     public InvitationResponse invite(@NotNull Long groupId, @NotNull Long currentUserId,
                                      @NotNull String email) {
-        ExpenseGroup group = loadGroupAsOwner(groupId, currentUserId,
+        ExpenseGroup group = lockGroupAsOwner(groupId, currentUserId,
                 "Only the group owner can invite members");
         String normalized = User.normalizeEmail(email);
 
@@ -72,7 +72,7 @@ public class InvitationService {
     @Transactional
     public void cancelInvitation(@NotNull Long groupId, @NotNull Long currentUserId,
                                  @NotNull Long invitationId) {
-        loadGroupAsOwner(groupId, currentUserId, "Only the group owner can cancel invitations");
+        lockGroupAsOwner(groupId, currentUserId, "Only the group owner can cancel invitations");
         GroupInvitation invitation = invitationRepository.findByIdAndGroupId(invitationId, groupId)
                 .orElseThrow(() -> new InvitationNotFoundException("Invitation not found"));
         if (!invitation.isPending()) {
@@ -94,7 +94,7 @@ public class InvitationService {
     @Transactional
     public GroupResponse acceptInvitation(@NotNull Long currentUserId, @NotNull Long invitationId) {
         User user = loadUser(currentUserId);
-        GroupInvitation invitation = findMyPendingInvitation(user, invitationId);
+        GroupInvitation invitation = lockGroupAndFindMyPendingInvitation(user, invitationId);
         ExpenseGroup group = groupRepository.findWithMembersById(invitation.getGroup().getId())
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
 
@@ -108,11 +108,20 @@ public class InvitationService {
     @Transactional
     public void declineInvitation(@NotNull Long currentUserId, @NotNull Long invitationId) {
         User user = loadUser(currentUserId);
-        findMyPendingInvitation(user, invitationId).decline();
+        lockGroupAndFindMyPendingInvitation(user, invitationId).decline();
     }
 
     private ExpenseGroup loadGroupAsOwner(Long groupId, Long currentUserId, String denyMessage) {
         groupAccess.requireMember(groupId, currentUserId);
+        return requireOwner(groupId, currentUserId, denyMessage);
+    }
+
+    private ExpenseGroup lockGroupAsOwner(Long groupId, Long currentUserId, String denyMessage) {
+        groupAccess.requireMemberAndLock(groupId, currentUserId);
+        return requireOwner(groupId, currentUserId, denyMessage);
+    }
+
+    private ExpenseGroup requireOwner(Long groupId, Long currentUserId, String denyMessage) {
         ExpenseGroup group = groupRepository.findWithMembersById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
         if (!group.isOwner(currentUserId)) {
@@ -131,5 +140,17 @@ public class InvitationService {
         return invitationRepository
                 .findByIdAndEmailAndStatus(invitationId, user.getEmail(), InvitationStatus.PENDING)
                 .orElseThrow(() -> new InvitationNotFoundException("Invitation not found"));
+    }
+
+    /**
+     * The group is known only through the invitation, so the invitation is read first, then the
+     * group is locked, and the invitation is checked again: it may have been cancelled or
+     * answered while this request waited for the lock.
+     */
+    private GroupInvitation lockGroupAndFindMyPendingInvitation(User user, Long invitationId) {
+        Long groupId = findMyPendingInvitation(user, invitationId).getGroup().getId();
+        groupRepository.findByIdForUpdate(groupId)
+                .orElseThrow(() -> new GroupNotFoundException("Group not found"));
+        return findMyPendingInvitation(user, invitationId);
     }
 }

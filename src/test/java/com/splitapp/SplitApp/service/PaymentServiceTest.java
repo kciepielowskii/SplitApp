@@ -5,6 +5,7 @@ import com.splitapp.SplitApp.dto.PaymentResponse;
 import com.splitapp.SplitApp.entity.ExpenseGroup;
 import com.splitapp.SplitApp.entity.GroupRole;
 import com.splitapp.SplitApp.entity.Payment;
+import com.splitapp.SplitApp.entity.PaymentStatus;
 import com.splitapp.SplitApp.entity.User;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
 import com.splitapp.SplitApp.exception.GroupAccessDeniedException;
@@ -14,7 +15,6 @@ import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.repository.GroupRepository;
 import com.splitapp.SplitApp.repository.PaymentRepository;
 import com.splitapp.SplitApp.repository.UserRepository;
-import com.splitapp.SplitApp.entity.PaymentStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -68,7 +68,7 @@ class PaymentServiceTest {
         PaymentResponse result = paymentService.createPayment(GROUP_ID, CURRENT_USER_ID,
                 request(1L, 2L, "10"));
 
-        verify(groupAccess).requireMember(GROUP_ID, CURRENT_USER_ID);
+        verify(groupAccess).requireMemberAndLock(GROUP_ID, CURRENT_USER_ID);
         assertEquals(GROUP_ID, result.groupId());
         assertEquals(1L, result.senderId());
         assertEquals(2L, result.receiverId());
@@ -203,7 +203,7 @@ class PaymentServiceTest {
     @Test
     void shouldNotCreatePaymentWhenCallerIsNotMember() {
         doThrow(new GroupAccessDeniedException("You are not a member of this group"))
-                .when(groupAccess).requireMember(GROUP_ID, 9L);
+                .when(groupAccess).requireMemberAndLock(GROUP_ID, 9L);
 
         assertThrows(GroupAccessDeniedException.class, () -> paymentService.createPayment(
                 GROUP_ID, 9L, request(1L, 2L, "10.00")));
@@ -231,7 +231,7 @@ class PaymentServiceTest {
 
         paymentService.deletePayment(GROUP_ID, 2L, 7L);
 
-        verify(groupAccess).requireMember(GROUP_ID, 2L);
+        verify(groupAccess).requireMemberAndLock(GROUP_ID, 2L);
         verify(paymentRepository).delete(payment);
     }
 
@@ -327,7 +327,7 @@ class PaymentServiceTest {
     @Test
     void shouldNotDeletePaymentWhenCallerIsNotMember() {
         doThrow(new GroupAccessDeniedException("You are not a member of this group"))
-                .when(groupAccess).requireMember(GROUP_ID, 9L);
+                .when(groupAccess).requireMemberAndLock(GROUP_ID, 9L);
 
         assertThrows(GroupAccessDeniedException.class,
                 () -> paymentService.deletePayment(GROUP_ID, 9L, 7L));
@@ -345,7 +345,7 @@ class PaymentServiceTest {
 
         PaymentResponse result = paymentService.confirmPayment(GROUP_ID, 3L, 7L);
 
-        verify(groupAccess).requireMember(GROUP_ID, 3L);
+        verify(groupAccess).requireMemberAndLock(GROUP_ID, 3L);
         assertEquals(PaymentStatus.CONFIRMED, result.status());
         assertEquals(PaymentStatus.CONFIRMED, payment.getStatus());
     }
@@ -390,7 +390,7 @@ class PaymentServiceTest {
     @Test
     void shouldNotConfirmPaymentWhenCallerIsNotMember() {
         doThrow(new GroupAccessDeniedException("You are not a member of this group"))
-                .when(groupAccess).requireMember(GROUP_ID, 9L);
+                .when(groupAccess).requireMemberAndLock(GROUP_ID, 9L);
 
         assertThrows(GroupAccessDeniedException.class,
                 () -> paymentService.confirmPayment(GROUP_ID, 9L, 7L));

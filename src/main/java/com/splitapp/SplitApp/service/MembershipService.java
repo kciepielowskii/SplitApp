@@ -68,7 +68,7 @@ public class MembershipService {
     }
 
     private ExpenseGroup loadGroup(Long groupId, Long currentUserId) {
-        groupAccess.requireMember(groupId, currentUserId);
+        groupAccess.requireMemberAndLock(groupId, currentUserId);
         return groupRepository.findWithMembersById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
     }

@@ -20,4 +20,19 @@ public class GroupAccess {
             throw new GroupAccessDeniedException("You are not a member of this group");
         }
     }
+
+    /**
+     * Like {@link #requireMember}, but also locks the group row until the end of the
+     * transaction. Every operation that changes who is in the group, who owns it, or its
+     * money has to use this one, so such operations on a single group run one after another.
+     * The lock is taken before anything else about the group is read.
+     */
+    public void requireMemberAndLock(Long groupId, Long userId) {
+        requireMember(groupId, userId);
+        groupRepository.findByIdForUpdate(groupId)
+                .orElseThrow(() -> new GroupNotFoundException("Group not found"));
+        if (!groupRepository.existsByIdAndMembersUserId(groupId, userId)) {
+            throw new GroupAccessDeniedException("You are not a member of this group");
+        }
+    }
 }
