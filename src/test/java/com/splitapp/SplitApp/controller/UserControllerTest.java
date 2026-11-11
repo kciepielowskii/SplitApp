@@ -64,17 +64,6 @@ class UserControllerTest {
     }
 
     @Test
-    void shouldReturn409WhenEmailAlreadyUsed() throws Exception {
-        when(userService.register(any(RegisterUserRequest.class)))
-                .thenThrow(new EmailAlreadyUsedException("Email is already in use"));
-
-        mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(VALID_BODY))
-                .andExpect(status().isConflict());
-    }
-
-    @Test
     void shouldRejectMalformedJson() throws Exception {
         mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -85,6 +74,19 @@ class UserControllerTest {
     }
 
     @Test
+    void shouldReturn409WhenEmailAlreadyUsed() throws Exception {
+        when(userService.register(any(RegisterUserRequest.class)))
+                .thenThrow(new EmailAlreadyUsedException("Email is already in use"));
+
+        mockMvc.perform(post("/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Conflict"))
+                .andExpect(jsonPath("$.detail").value("Email is already in use"));
+    }
+
+    @Test
     void shouldReturn409WhenDatabaseRejectsDuplicate() throws Exception {
         when(userService.register(any(RegisterUserRequest.class)))
                 .thenThrow(new DataIntegrityViolationException("duplicate key"));
@@ -92,6 +94,9 @@ class UserControllerTest {
         mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_BODY))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Conflict"))
+                .andExpect(jsonPath("$.detail").value("The request conflicts with existing data"));
     }
+
 }
