@@ -90,7 +90,7 @@ class ApplicationFlowIntegrationTest {
     void shouldReturn404WhenCreatingExpenseInUnknownGroup() throws Exception {
         TestUser user = registerUser(uniqueEmail());
 
-        send(user, "/groups/999999/expenses", """
+        send(user, "/groups/9223372036854775807/expenses", """
                 {"amount":10.00,"category":"FOOD","paidById":1,"participantIds":[1]}
                 """)
                 .andExpect(status().isNotFound())
@@ -115,7 +115,7 @@ class ApplicationFlowIntegrationTest {
     void shouldReturn404WhenCreatingPaymentInUnknownGroup() throws Exception {
         TestUser user = registerUser(uniqueEmail());
 
-        send(user, "/groups/999999/payments", """
+        send(user, "/groups/9223372036854775807/payments", """
                 {"senderId":1,"receiverId":2,"amount":10.00}
                 """)
                 .andExpect(status().isNotFound())
@@ -193,7 +193,7 @@ class ApplicationFlowIntegrationTest {
     void shouldReturn404WhenGettingUnknownGroup() throws Exception {
         TestUser user = registerUser(uniqueEmail());
 
-        fetch(user, "/groups/999999")
+        fetch(user, "/groups/9223372036854775807")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Group not found"));
     }
@@ -233,10 +233,10 @@ class ApplicationFlowIntegrationTest {
     void shouldReturn404WhenListingExpensesAndPaymentsOfUnknownGroup() throws Exception {
         TestUser user = registerUser(uniqueEmail());
 
-        fetch(user, "/groups/999999/expenses")
+        fetch(user, "/groups/9223372036854775807/expenses")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Group not found"));
-        fetch(user, "/groups/999999/payments")
+        fetch(user, "/groups/9223372036854775807/payments")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Group not found"));
     }
@@ -325,7 +325,7 @@ class ApplicationFlowIntegrationTest {
         send(third, url, "")
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.detail").value("Payment is already confirmed"));
-        send(third, "/groups/%d/payments/999999/confirm".formatted(groupId), "")
+        send(third, "/groups/%d/payments/9223372036854775807/confirm".formatted(groupId), "")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Payment not found"));
     }
@@ -334,7 +334,7 @@ class ApplicationFlowIntegrationTest {
     void shouldReturn404WhenGettingBalancesOfUnknownGroup() throws Exception {
         TestUser user = registerUser(uniqueEmail());
 
-        fetch(user, "/groups/999999/balances")
+        fetch(user, "/groups/9223372036854775807/balances")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Group not found"));
     }
@@ -385,7 +385,7 @@ class ApplicationFlowIntegrationTest {
 
     @Test
     void shouldReturn401WithoutCredentials() throws Exception {
-        mockMvc.perform(get("/groups/999999"))
+        mockMvc.perform(get("/groups/9223372036854775807"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.title").value("Unauthorized"));
     }
@@ -395,7 +395,7 @@ class ApplicationFlowIntegrationTest {
         TestUser user = registerUser(uniqueEmail());
 
         // 404 means the request got past authentication and reached the controller
-        fetch(user, "/groups/999999")
+        fetch(user, "/groups/9223372036854775807")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Group not found"));
     }
@@ -404,10 +404,10 @@ class ApplicationFlowIntegrationTest {
     void shouldReturn401ForWrongPasswordAndUnknownUser() throws Exception {
         TestUser user = registerUser(uniqueEmail());
 
-        mockMvc.perform(get("/groups/999999").with(httpBasic(user.email(), "wrong-password")))
+        mockMvc.perform(get("/groups/9223372036854775807").with(httpBasic(user.email(), "wrong-password")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.title").value("Unauthorized"));
-        mockMvc.perform(get("/groups/999999").with(httpBasic("nobody@example.com", PASSWORD)))
+        mockMvc.perform(get("/groups/9223372036854775807").with(httpBasic("nobody@example.com", PASSWORD)))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -842,7 +842,7 @@ class ApplicationFlowIntegrationTest {
                 {"userId":%d}
                 """.formatted(outsider.id()))
                 .andExpect(status().isForbidden());
-        send(outsider, "/groups/999999/leave", "")
+        send(outsider, "/groups/9223372036854775807/leave", "")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Group not found"));
     }
