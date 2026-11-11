@@ -11,21 +11,8 @@
 	<groupId>com.splitapp</groupId>
 	<artifactId>SplitApp</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
+	<name>SplitApp</name>
+	<description>REST API for splitting shared expenses within a group</description>
 	<properties>
 		<java.version>17</java.version>
 	</properties>
