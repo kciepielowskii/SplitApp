@@ -21,7 +21,8 @@ public class GroupController {
 
     @PostMapping
     public ResponseEntity<GroupResponse> createGroup(@Valid @RequestBody CreateGroupRequest request) {
-        GroupResponse response = groupService.createGroup(request.groupName(), request.userId());
+        GroupResponse response = groupService.createGroup(
+                request.groupName(), request.groupDescription(), request.userId());
         return ResponseEntity.created(URI.create("/groups/" + response.id())).body(response);
     }
 }

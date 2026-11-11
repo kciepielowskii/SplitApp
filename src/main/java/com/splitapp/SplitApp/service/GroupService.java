@@ -24,11 +24,12 @@ public class GroupService {
 
     @Transactional
     public GroupResponse createGroup(@NotBlank @Size(max = 100) String groupName,
+                                     @Size(max = 255) String groupDescription,
                                      @NotNull Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
-        ExpenseGroup group = new ExpenseGroup(groupName, user);
+        ExpenseGroup group = new ExpenseGroup(groupName, groupDescription, user);
         group.addMember(user, GroupRole.OWNER);
         return GroupResponse.from(groupRepository.save(group));
     }

@@ -52,7 +52,7 @@ class GroupServiceTest {
         when(groupRepository.save(any(ExpenseGroup.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        GroupResponse result = groupService.createGroup("Wyjazd", 1L);
+        GroupResponse result = groupService.createGroup("Wyjazd", null, 1L);
 
         assertNotNull(result);
         assertEquals("Wyjazd", result.groupName());
@@ -63,12 +63,23 @@ class GroupServiceTest {
     }
 
     @Test
+    void shouldSaveGroupDescription() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(createUser(1L)));
+        when(groupRepository.save(any(ExpenseGroup.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        GroupResponse result = groupService.createGroup("Wyjazd", "Weekend w górach", 1L);
+
+        assertEquals("Weekend w górach", result.groupDescription());
+    }
+
+    @Test
     void shouldThrowExceptionWhenUserDoesNotExist() {
         when(userRepository.findById(1L))
                 .thenReturn(Optional.empty());
 
         UserNotFoundException ex = assertThrows(UserNotFoundException.class,
-                () -> groupService.createGroup("Wyjazd", 1L));
+                () -> groupService.createGroup("Wyjazd", null, 1L));
 
         assertEquals("User not found", ex.getMessage());
         verify(groupRepository, never()).save(any(ExpenseGroup.class));
@@ -76,29 +87,36 @@ class GroupServiceTest {
 
     @Test
     void shouldRejectBlankGroupName() throws Exception {
-        assertEquals(1, validateCreateGroup(" ", 1L).size());
+        assertEquals(1, validateCreateGroup(" ", null, 1L).size());
     }
 
     @Test
     void shouldRejectNullUserId() throws Exception {
-        assertEquals(1, validateCreateGroup("Wyjazd", null).size());
+        assertEquals(1, validateCreateGroup("Wyjazd", null, null).size());
     }
 
     @Test
     void shouldRejectGroupNameLongerThan100Characters() throws Exception {
-        assertEquals(1, validateCreateGroup("a".repeat(101), 1L).size());
+        assertEquals(1, validateCreateGroup("a".repeat(101), null, 1L).size());
     }
 
     @Test
     void shouldAcceptGroupNameOf100Characters() throws Exception {
-        assertTrue(validateCreateGroup("a".repeat(100), 1L).isEmpty());
+        assertTrue(validateCreateGroup("a".repeat(100), null, 1L).isEmpty());
     }
 
-    private Set<ConstraintViolation<GroupService>> validateCreateGroup(String groupName, Long userId)
-            throws NoSuchMethodException {
-        Method method = GroupService.class.getMethod("createGroup", String.class, Long.class);
+    @Test
+    void shouldRejectGroupDescriptionLongerThan255Characters() throws Exception {
+        assertEquals(1, validateCreateGroup("Wyjazd", "a".repeat(256), 1L).size());
+    }
+
+    private Set<ConstraintViolation<GroupService>> validateCreateGroup(
+            String groupName, String groupDescription, Long userId) throws NoSuchMethodException {
+        Method method = GroupService.class.getMethod(
+                "createGroup", String.class, String.class, Long.class);
         return validator.forExecutables()
-                .validateParameters(groupService, method, new Object[]{groupName, userId});
+                .validateParameters(groupService, method,
+                        new Object[]{groupName, groupDescription, userId});
     }
 
     private User createUser(Long id) {
