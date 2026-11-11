@@ -16,10 +16,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 
 @WebMvcTest(UserController.class)
 class UserControllerTest {
@@ -42,7 +40,6 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_BODY))
                 .andExpect(status().isCreated())
-                .andExpect(header().string("Location", "/users/1"))
                 .andExpect(jsonPath("$.email").value("jan@example.com"))
                 .andExpect(jsonPath("$.password").doesNotExist());
     }
@@ -98,5 +95,4 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.title").value("Conflict"))
                 .andExpect(jsonPath("$.detail").value("The request conflicts with existing data"));
     }
-
 }

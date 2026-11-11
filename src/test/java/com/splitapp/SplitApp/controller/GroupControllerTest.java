@@ -17,7 +17,6 @@ import java.util.List;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -41,7 +40,6 @@ class GroupControllerTest {
                                 {"groupName":"Wyjazd","userId":1}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(header().string("Location", "/groups/1"))
                 .andExpect(jsonPath("$.groupName").value("Wyjazd"))
                 .andExpect(jsonPath("$.members[0].role").value("OWNER"))
                 .andExpect(jsonPath("$.id").value(1))

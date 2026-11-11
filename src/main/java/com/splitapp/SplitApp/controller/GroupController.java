@@ -5,13 +5,12 @@ import com.splitapp.SplitApp.dto.GroupResponse;
 import com.splitapp.SplitApp.service.GroupService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.net.URI;
 
 @RestController
 @RequestMapping("/groups")
@@ -20,9 +19,9 @@ public class GroupController {
     private final GroupService groupService;
 
     @PostMapping
-    public ResponseEntity<GroupResponse> createGroup(@Valid @RequestBody CreateGroupRequest request) {
-        GroupResponse response = groupService.createGroup(
+    @ResponseStatus(HttpStatus.CREATED)
+    public GroupResponse createGroup(@Valid @RequestBody CreateGroupRequest request) {
+        return groupService.createGroup(
                 request.groupName(), request.groupDescription(), request.userId());
-        return ResponseEntity.created(URI.create("/groups/" + response.id())).body(response);
     }
 }
