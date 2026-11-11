@@ -17,6 +17,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 
@@ -49,6 +50,9 @@ class DatabaseConstraintsTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private final ExpenseCategory category = ExpenseCategory.values()[0];
 
@@ -150,5 +154,30 @@ class DatabaseConstraintsTest {
 
     private ExpenseGroup saveGroup(User owner) {
         return groupRepository.saveAndFlush(new ExpenseGroup("Wyjazd", owner));
+    }
+
+    @Test
+    void shouldRejectUnknownGroupRole() {
+        User user = saveUser("member@example.com");
+        ExpenseGroup group = saveGroup(user);
+        groupMemberRepository.saveAndFlush(new GroupMember(group, user, GroupRole.OWNER));
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbcTemplate.update(
+                        "UPDATE group_members SET role = 'ADMIN' WHERE group_id = ? AND user_id = ?",
+                        group.getId(), user.getId()));
+    }
+
+    @Test
+    void shouldRejectUnknownExpenseCategory() {
+        User user = saveUser("payer@example.com");
+        ExpenseGroup group = saveGroup(user);
+        Expense expense = expenseRepository.saveAndFlush(
+                new Expense(TEN, category, "Obiad", group, user));
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbcTemplate.update(
+                        "UPDATE expenses SET category = 'GAMBLING' WHERE id = ?",
+                        expense.getId()));
     }
 }
