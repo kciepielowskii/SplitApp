@@ -2,6 +2,7 @@ package com.splitapp.SplitApp.entity;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
@@ -25,5 +26,22 @@ class GroupMemberTest {
     void shouldRejectNullRole() {
         assertThrows(NullPointerException.class,
                 () -> new GroupMember(group, user, null));
+    }
+
+    @Test
+    void shouldChangeRole() {
+        GroupMember member = new GroupMember(group, user, GroupRole.MEMBER);
+
+        member.changeRole(GroupRole.OWNER);
+
+        assertEquals(GroupRole.OWNER, member.getRole());
+    }
+
+    @Test
+    void shouldRejectNullRoleWhenChangingRole() {
+        GroupMember member = new GroupMember(group, user, GroupRole.MEMBER);
+
+        assertThrows(NullPointerException.class, () -> member.changeRole(null));
+        assertEquals(GroupRole.MEMBER, member.getRole());
     }
 }

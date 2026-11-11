@@ -63,4 +63,8 @@ public class GroupMember {
         this.user = Objects.requireNonNull(user, "User is required");
         this.role = Objects.requireNonNull(role, "Role is required");
     }
+
+    public void changeRole(GroupRole role) {
+        this.role = Objects.requireNonNull(role, "Role is required");
+    }
 }
