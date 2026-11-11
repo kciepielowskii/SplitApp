@@ -70,7 +70,35 @@ class PaymentServiceTest {
         assertEquals(GROUP_ID, result.groupId());
         assertEquals(1L, result.senderId());
         assertEquals(2L, result.receiverId());
+        assertEquals(1L, result.createdById());
         assertEquals(new BigDecimal("10.00"), result.amount());
+    }
+
+    @Test
+    void shouldAllowReceiverToRecordPayment() {
+        User u1 = user(1L);
+        User u2 = user(2L);
+        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1, u2)));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(u1));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(u2));
+        when(paymentRepository.save(any(Payment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentResponse result = paymentService.createPayment(GROUP_ID, 2L,
+                request(1L, 2L, "10"));
+
+        assertEquals(1L, result.senderId());
+        assertEquals(2L, result.receiverId());
+        assertEquals(2L, result.createdById());
+    }
+
+    @Test
+    void shouldRejectPaymentWhenCallerIsNeitherSenderNorReceiver() {
+        GroupAccessDeniedException ex = assertThrows(GroupAccessDeniedException.class,
+                () -> paymentService.createPayment(GROUP_ID, 3L, request(1L, 2L, "10.00")));
+
+        assertEquals("You can only record payments you are part of", ex.getMessage());
+        verifyNoInteractions(groupRepository, userRepository, paymentRepository);
     }
 
     @Test
@@ -144,7 +172,7 @@ class PaymentServiceTest {
     void shouldReturnGroupPayments() {
         User u1 = user(1L);
         User u2 = user(2L);
-        Payment payment = new Payment(group(u1, u2), u1, u2, new BigDecimal("10.00"));
+        Payment payment = new Payment(group(u1, u2), u1, u2, new BigDecimal("10.00"), u1);
         when(paymentRepository.findAllByGroupIdOrderByPaidAtDescIdDesc(GROUP_ID))
                 .thenReturn(List.of(payment));
 
@@ -154,6 +182,7 @@ class PaymentServiceTest {
         assertEquals(1, result.size());
         assertEquals(1L, result.get(0).senderId());
         assertEquals(2L, result.get(0).receiverId());
+        assertEquals(1L, result.get(0).createdById());
     }
 
     @Test

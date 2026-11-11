@@ -65,6 +65,7 @@ class ExpenseServiceTest {
         User u3 = user(3L);
         when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1, u2, u3)));
         when(userRepository.findById(1L)).thenReturn(Optional.of(u1));
+        when(userRepository.getReferenceById(CURRENT_USER_ID)).thenReturn(u1);
         when(userRepository.findAllById(List.of(1L, 2L, 3L))).thenReturn(List.of(u1, u2, u3));
         when(expenseRepository.save(any(Expense.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -76,10 +77,29 @@ class ExpenseServiceTest {
         assertEquals(GROUP_ID, result.groupId());
         assertEquals(new BigDecimal("10.00"), result.amount());
         assertEquals(1L, result.paidById());
+        assertEquals(1L, result.createdById());
         assertEquals(List.of(
                 new ExpenseSplitResponse(1L, new BigDecimal("3.34")),
                 new ExpenseSplitResponse(2L, new BigDecimal("3.33")),
                 new ExpenseSplitResponse(3L, new BigDecimal("3.33"))), result.splits());
+    }
+
+    @Test
+    void shouldRecordCallerAsAuthorEvenWhenSomeoneElsePaid() {
+        User u1 = user(1L);
+        User u2 = user(2L);
+        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1, u2)));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(u2));
+        when(userRepository.getReferenceById(CURRENT_USER_ID)).thenReturn(u1);
+        when(userRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(u1, u2));
+        when(expenseRepository.save(any(Expense.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ExpenseResponse result = expenseService.createExpense(GROUP_ID, CURRENT_USER_ID,
+                request("10.00", 2L, List.of(1L, 2L)));
+
+        assertEquals(2L, result.paidById());
+        assertEquals(1L, result.createdById());
     }
 
     @Test
@@ -126,6 +146,7 @@ class ExpenseServiceTest {
         User outsider = user(2L);
         when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1)));
         when(userRepository.findById(1L)).thenReturn(Optional.of(u1));
+        when(userRepository.getReferenceById(CURRENT_USER_ID)).thenReturn(u1);
         when(userRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(u1, outsider));
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class,
@@ -183,7 +204,7 @@ class ExpenseServiceTest {
     void shouldReturnGroupExpenses() {
         User u1 = user(1L);
         ExpenseGroup group = group(u1);
-        Expense expense = new Expense(new BigDecimal("10.00"), ExpenseCategory.FOOD, "Obiad", group, u1);
+        Expense expense = new Expense(new BigDecimal("10.00"), ExpenseCategory.FOOD, "Obiad", group, u1, u1);
         expense.addSplit(new ExpenseSplit(u1, new BigDecimal("10.00")));
         when(expenseRepository.findAllByGroupIdOrderByCreatedAtDescIdDesc(GROUP_ID))
                 .thenReturn(List.of(expense));
@@ -193,6 +214,7 @@ class ExpenseServiceTest {
         verify(groupAccess).requireMember(GROUP_ID, CURRENT_USER_ID);
         assertEquals(1, result.size());
         assertEquals(1L, result.get(0).paidById());
+        assertEquals(1L, result.get(0).createdById());
         assertEquals(1, result.get(0).splits().size());
     }
 
@@ -213,6 +235,7 @@ class ExpenseServiceTest {
         User u2 = user(2L);
         when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1, u2)));
         when(userRepository.findById(1L)).thenReturn(Optional.of(u1));
+        when(userRepository.getReferenceById(CURRENT_USER_ID)).thenReturn(u1);
         when(userRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(u1, u2));
         when(expenseRepository.save(any(Expense.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -231,6 +254,7 @@ class ExpenseServiceTest {
         User u2 = user(2L);
         when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1, u2)));
         when(userRepository.findById(1L)).thenReturn(Optional.of(u1));
+        when(userRepository.getReferenceById(CURRENT_USER_ID)).thenReturn(u1);
         when(userRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(u1, u2));
         when(expenseRepository.save(any(Expense.class))).thenAnswer(inv -> inv.getArgument(0));
 

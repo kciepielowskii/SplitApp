@@ -61,11 +61,11 @@ class BalanceServiceTest {
         User u2 = user(2L);
         User u3 = user(3L);
         ExpenseGroup group = group(u1, u2, u3);
-        Expense expense = new Expense(new BigDecimal("30.00"), ExpenseCategory.FOOD, "Obiad", group, u1);
+        Expense expense = new Expense(new BigDecimal("30.00"), ExpenseCategory.FOOD, "Obiad", group, u1, u1);
         expense.addSplit(new ExpenseSplit(u1, new BigDecimal("10.00")));
         expense.addSplit(new ExpenseSplit(u2, new BigDecimal("10.00")));
         expense.addSplit(new ExpenseSplit(u3, new BigDecimal("10.00")));
-        Payment payment = new Payment(group, u2, u1, new BigDecimal("10.00"));
+        Payment payment = new Payment(group, u2, u1, new BigDecimal("10.00"), u2);
         when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.of(group));
         when(expenseRepository.findAllByGroupIdOrderByCreatedAtDescIdDesc(GROUP_ID))
                 .thenReturn(List.of(expense));

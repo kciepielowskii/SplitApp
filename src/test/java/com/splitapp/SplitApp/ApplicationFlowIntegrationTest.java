@@ -67,6 +67,7 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.groupId").value(groupId))
                 .andExpect(jsonPath("$.paidById").value(user.id()))
+                .andExpect(jsonPath("$.createdById").value(user.id()))
                 .andExpect(jsonPath("$.splits[0].userId").value(user.id()))
                 .andExpect(jsonPath("$.splits[0].amount").value(10.0));
     }
@@ -150,6 +151,7 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.senderId").value(friend.id()))
                 .andExpect(jsonPath("$.receiverId").value(owner.id()))
+                .andExpect(jsonPath("$.createdById").value(friend.id()))
                 .andExpect(jsonPath("$.amount").value(10.0))
                 .andExpect(jsonPath("$.paidAt").isNotEmpty());
     }
@@ -420,6 +422,25 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.createdById").value(user.id()))
                 .andExpect(jsonPath("$.members[0].userId").value(user.id()));
+    }
+
+    @Test
+    void shouldRecordWhoCreatedAnExpensePaidBySomeoneElse() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+
+        send(friend, "/groups/%d/expenses".formatted(groupId), """
+                {"amount":10.00,"category":"FOOD","paidById":%d,"participantIds":[%d,%d]}
+                """.formatted(owner.id(), owner.id(), friend.id()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.paidById").value(owner.id()))
+                .andExpect(jsonPath("$.createdById").value(friend.id()));
+
+        fetch(owner, "/groups/%d/expenses".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].createdById").value(friend.id()));
     }
 
     @Test

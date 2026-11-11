@@ -44,7 +44,7 @@ class PaymentControllerTest {
 
     @Test
     void shouldCreatePayment() throws Exception {
-        PaymentResponse response = new PaymentResponse(7L, 1L, 1L, 2L,
+        PaymentResponse response = new PaymentResponse(7L, 1L, 1L, 2L, 1L,
                 new BigDecimal("10.00"), Instant.parse("2026-11-11T12:00:00Z"));
         when(paymentService.createPayment(eq(1L), eq(1L), any(CreatePaymentRequest.class)))
                 .thenReturn(response);
@@ -112,7 +112,7 @@ class PaymentControllerTest {
 
     @Test
     void shouldReturnGroupPayments() throws Exception {
-        PaymentResponse response = new PaymentResponse(7L, 1L, 1L, 2L,
+        PaymentResponse response = new PaymentResponse(7L, 1L, 1L, 2L, 1L,
                 new BigDecimal("10.00"), Instant.parse("2026-11-11T12:00:00Z"));
         when(paymentService.getPayments(1L, 1L)).thenReturn(List.of(response));
 
@@ -120,7 +120,8 @@ class PaymentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].senderId").value(1))
-                .andExpect(jsonPath("$[0].receiverId").value(2));
+                .andExpect(jsonPath("$[0].receiverId").value(2))
+                .andExpect(jsonPath("$[0].createdById").value(1));
     }
 
     @Test

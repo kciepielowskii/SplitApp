@@ -13,6 +13,7 @@ public record ExpenseResponse(
         ExpenseCategory category,
         String description,
         Long paidById,
+        Long createdById,
         List<ExpenseSplitResponse> splits) {
 
     public static ExpenseResponse from(Expense expense) {
@@ -23,6 +24,7 @@ public record ExpenseResponse(
                 expense.getCategory(),
                 expense.getDescription(),
                 expense.getPaidBy().getId(),
+                expense.getCreatedBy().getId(),
                 expense.getSplits().stream()
                         .map(ExpenseSplitResponse::from)
                         .toList());

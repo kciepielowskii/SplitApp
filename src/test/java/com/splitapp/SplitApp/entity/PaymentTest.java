@@ -25,7 +25,7 @@ class PaymentTest {
         User user = mock(User.class);
 
         assertThrows(IllegalArgumentException.class,
-                () -> new Payment(group, user, user, BigDecimal.TEN));
+                () -> new Payment(group, user, user, BigDecimal.TEN, user));
     }
 
     @Test
@@ -36,7 +36,7 @@ class PaymentTest {
         when(receiver.getId()).thenReturn(1L);
 
         assertThrows(IllegalArgumentException.class,
-                () -> new Payment(group, sender, receiver, BigDecimal.TEN));
+                () -> new Payment(group, sender, receiver, BigDecimal.TEN, sender));
     }
 
     @Test
@@ -46,7 +46,7 @@ class PaymentTest {
         when(sender.getId()).thenReturn(1L);
         when(receiver.getId()).thenReturn(2L);
 
-        assertDoesNotThrow(() -> new Payment(group, sender, receiver, BigDecimal.TEN));
+        assertDoesNotThrow(() -> new Payment(group, sender, receiver, BigDecimal.TEN, sender));
     }
 
     @Test
@@ -54,7 +54,18 @@ class PaymentTest {
         User receiver = mock(User.class);
 
         assertThrows(NullPointerException.class,
-                () -> new Payment(group, null, receiver, BigDecimal.TEN));
+                () -> new Payment(group, null, receiver, BigDecimal.TEN, receiver));
+    }
+
+    @Test
+    void shouldRejectNullAuthor() {
+        User sender = mock(User.class);
+        User receiver = mock(User.class);
+        when(sender.getId()).thenReturn(1L);
+        when(receiver.getId()).thenReturn(2L);
+
+        assertThrows(NullPointerException.class,
+                () -> new Payment(group, sender, receiver, BigDecimal.TEN, null));
     }
 
     @Test
@@ -66,7 +77,7 @@ class PaymentTest {
         when(group.hasMember(sender)).thenReturn(false);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> new Payment(group, sender, receiver, BigDecimal.TEN));
+                () -> new Payment(group, sender, receiver, BigDecimal.TEN, sender));
 
         assertEquals("Sender is not a member of this group", ex.getMessage());
     }
@@ -80,7 +91,7 @@ class PaymentTest {
         when(group.hasMember(receiver)).thenReturn(false);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> new Payment(group, sender, receiver, BigDecimal.TEN));
+                () -> new Payment(group, sender, receiver, BigDecimal.TEN, sender));
 
         assertEquals("Receiver is not a member of this group", ex.getMessage());
     }

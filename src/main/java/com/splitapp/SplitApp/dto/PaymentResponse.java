@@ -10,6 +10,7 @@ public record PaymentResponse(
         Long groupId,
         Long senderId,
         Long receiverId,
+        Long createdById,
         BigDecimal amount,
         Instant paidAt) {
 
@@ -19,6 +20,7 @@ public record PaymentResponse(
                 payment.getGroup().getId(),
                 payment.getSender().getId(),
                 payment.getReceiver().getId(),
+                payment.getCreatedBy().getId(),
                 payment.getAmount(),
                 payment.getPaidAt());
     }

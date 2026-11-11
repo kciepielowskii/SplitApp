@@ -60,7 +60,9 @@ public class ExpenseService {
         List<BigDecimal> amounts = calculateAmounts(request, participantIds.size());
 
         BigDecimal amount = request.amount().setScale(2, RoundingMode.UNNECESSARY);
-        Expense expense = new Expense(amount, request.category(), request.description(), group, payer);
+        User createdBy = userRepository.getReferenceById(currentUserId);
+        Expense expense = new Expense(amount, request.category(), request.description(),
+                group, payer, createdBy);
         for (int i = 0; i < participantIds.size(); i++) {
             User participant = participants.get(participantIds.get(i));
             requireMember(group, participant, "Participant is not a member of this group");
