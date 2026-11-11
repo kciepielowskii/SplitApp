@@ -143,4 +143,31 @@ class ApplicationFlowIntegrationTest {
         Number id = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
         return id.longValue();
     }
+
+    @Test
+    void shouldReturn422WhenPaymentReceiverIsNotInGroup() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long outsiderId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+
+        mockMvc.perform(post("/groups/%d/payments".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"senderId":%d,"receiverId":%d,"amount":10.00}
+                                """.formatted(ownerId, outsiderId)))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.title").value("Business rule violation"))
+                .andExpect(jsonPath("$.detail").value("Receiver is not a member of this group"));
+    }
+
+    @Test
+    void shouldReturn404WhenCreatingPaymentInUnknownGroup() throws Exception {
+        mockMvc.perform(post("/groups/999999/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"senderId":1,"receiverId":2,"amount":10.00}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
+    }
 }
