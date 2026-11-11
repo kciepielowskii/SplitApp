@@ -69,13 +69,16 @@ public class ExpenseGroup {
         this.groupDescription = groupDescription;
     }
 
+    public boolean hasMember(User user) {
+        return members.stream()
+                .anyMatch(member -> User.sameUser(member.getUser(), user));
+    }
+
     public GroupMember addMember(User user, GroupRole role) {
         Objects.requireNonNull(user, "User is required");
         Objects.requireNonNull(role, "Role is required");
 
-        boolean alreadyMember = members.stream()
-                .anyMatch(member -> User.sameUser(member.getUser(), user));
-        if (alreadyMember) {
+        if (hasMember(user)) {
             throw new IllegalArgumentException("User is already a member of this group");
         }
 

@@ -1,5 +1,6 @@
 package com.splitapp.SplitApp.entity;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -8,12 +9,19 @@ import java.math.BigDecimal;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ExpenseTest {
     private final ExpenseGroup group = mock(ExpenseGroup.class);
     private final User paidBy = mock(User.class);
     private final ExpenseCategory category = ExpenseCategory.values()[0];
+
+    @BeforeEach
+    void setUp() {
+        when(group.hasMember(any(User.class))).thenReturn(true);
+    }
 
     @Test
     void shouldRejectNullAmount() {
@@ -44,6 +52,13 @@ class ExpenseTest {
         assertDoesNotThrow(() -> new Expense(BigDecimal.TEN, category, null, group, paidBy));
     }
 
+    @Test
+    void shouldRejectPayerWhoIsNotGroupMember() {
+        when(group.hasMember(paidBy)).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class, () -> expense());
+    }
+
     private User user(Long id) {
         User user = new User("Jan", "Kowalski", "jan" + id + "@example.com", "hash");
         ReflectionTestUtils.setField(user, "id", id);
@@ -72,6 +87,17 @@ class ExpenseTest {
         assertThrows(IllegalArgumentException.class,
                 () -> expense.addSplit(new ExpenseSplit(user(1L), BigDecimal.valueOf(5))));
         assertEquals(1, expense.getSplits().size());
+    }
+
+    @Test
+    void shouldRejectSplitForUserWhoIsNotGroupMember() {
+        Expense expense = expense();
+        User outsider = user(3L);
+        when(group.hasMember(outsider)).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> expense.addSplit(new ExpenseSplit(outsider, BigDecimal.valueOf(5))));
+        assertEquals(0, expense.getSplits().size());
     }
 
     @Test

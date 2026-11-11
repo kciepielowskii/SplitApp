@@ -78,6 +78,10 @@ public class Expense {
         this.description = description;
         this.group = Objects.requireNonNull(group, "Group is required");
         this.paidBy = Objects.requireNonNull(paidBy, "Payer is required");
+
+        if (!group.hasMember(paidBy)) {
+            throw new IllegalArgumentException("Payer is not a member of this group");
+        }
     }
 
     public List<ExpenseSplit> getSplits() {
@@ -86,6 +90,10 @@ public class Expense {
 
     public void addSplit(ExpenseSplit split) {
         Objects.requireNonNull(split, "Split is required");
+
+        if (!group.hasMember(split.getUser())) {
+            throw new IllegalArgumentException("User is not a member of this group");
+        }
 
         boolean duplicate = splits.stream()
                 .anyMatch(existing -> User.sameUser(existing.getUser(), split.getUser()));

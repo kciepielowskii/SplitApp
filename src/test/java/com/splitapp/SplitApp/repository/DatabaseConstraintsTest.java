@@ -16,8 +16,8 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 
@@ -81,7 +81,6 @@ class DatabaseConstraintsTest {
     void shouldRejectSameUserTwiceInOneGroup() {
         User user = saveUser("member@example.com");
         ExpenseGroup group = saveGroup(user);
-        groupMemberRepository.saveAndFlush(new GroupMember(group, user, GroupRole.OWNER));
 
         assertThrows(DataIntegrityViolationException.class,
                 () -> groupMemberRepository.saveAndFlush(
@@ -129,6 +128,7 @@ class DatabaseConstraintsTest {
         User sender = saveUser("sender@example.com");
         User receiver = saveUser("receiver@example.com");
         ExpenseGroup group = saveGroup(sender);
+        group.addMember(receiver, GroupRole.MEMBER);
 
         assertThrows(DataIntegrityViolationException.class,
                 () -> paymentRepository.saveAndFlush(
@@ -140,6 +140,7 @@ class DatabaseConstraintsTest {
         User sender = saveUser("sender@example.com");
         User receiver = saveUser("receiver@example.com");
         ExpenseGroup group = saveGroup(sender);
+        group.addMember(receiver, GroupRole.MEMBER);
         Payment payment = new Payment(group, sender, receiver, TEN);
         // the constructor refuses sender == receiver, so bypass it to test the DB check
         ReflectionTestUtils.setField(payment, "receiver", sender);
@@ -148,19 +149,10 @@ class DatabaseConstraintsTest {
                 () -> paymentRepository.saveAndFlush(payment));
     }
 
-    private User saveUser(String email) {
-        return userRepository.saveAndFlush(new User("Jan", "Kowalski", email, "hash"));
-    }
-
-    private ExpenseGroup saveGroup(User owner) {
-        return groupRepository.saveAndFlush(new ExpenseGroup("Wyjazd", owner));
-    }
-
     @Test
     void shouldRejectUnknownGroupRole() {
         User user = saveUser("member@example.com");
         ExpenseGroup group = saveGroup(user);
-        groupMemberRepository.saveAndFlush(new GroupMember(group, user, GroupRole.OWNER));
 
         assertThrows(DataIntegrityViolationException.class,
                 () -> jdbcTemplate.update(
@@ -179,5 +171,15 @@ class DatabaseConstraintsTest {
                 () -> jdbcTemplate.update(
                         "UPDATE expenses SET category = 'GAMBLING' WHERE id = ?",
                         expense.getId()));
+    }
+
+    private User saveUser(String email) {
+        return userRepository.saveAndFlush(new User("Jan", "Kowalski", email, "hash"));
+    }
+
+    private ExpenseGroup saveGroup(User owner) {
+        ExpenseGroup group = new ExpenseGroup("Wyjazd", owner);
+        group.addMember(owner, GroupRole.OWNER);
+        return groupRepository.saveAndFlush(group);
     }
 }
