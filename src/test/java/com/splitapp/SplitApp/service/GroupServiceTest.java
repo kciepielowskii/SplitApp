@@ -7,6 +7,7 @@ import com.splitapp.SplitApp.entity.User;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.repository.GroupRepository;
 import com.splitapp.SplitApp.repository.UserRepository;
+import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
@@ -14,15 +15,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -43,8 +45,8 @@ class GroupServiceTest {
     private GroupService groupService;
 
     @Test
-    void shouldCreateGroupSuccessfully() throws Exception {
-        User user = createUser();
+    void shouldCreateGroupSuccessfully() {
+        User user = createUser(1L);
         when(userRepository.findById(1L))
                 .thenReturn(Optional.of(user));
         when(groupRepository.save(any(ExpenseGroup.class)))
@@ -54,7 +56,9 @@ class GroupServiceTest {
 
         assertNotNull(result);
         assertEquals("Wyjazd", result.groupName());
+        assertEquals(1L, result.createdById());
         assertEquals(1, result.members().size());
+        assertEquals(1L, result.members().get(0).userId());
         assertEquals(GroupRole.OWNER, result.members().get(0).role());
     }
 
@@ -72,27 +76,34 @@ class GroupServiceTest {
 
     @Test
     void shouldRejectBlankGroupName() throws Exception {
-        Method method = GroupService.class.getMethod("createGroup", String.class, Long.class);
-
-        var violations = validator.forExecutables()
-                .validateParameters(groupService, method, new Object[]{" ", 1L});
-
-        assertFalse(violations.isEmpty());
+        assertEquals(1, validateCreateGroup(" ", 1L).size());
     }
 
     @Test
     void shouldRejectNullUserId() throws Exception {
-        Method method = GroupService.class.getMethod("createGroup", String.class, Long.class);
-
-        var violations = validator.forExecutables()
-                .validateParameters(groupService, method, new Object[]{"Wyjazd", null});
-
-        assertFalse(violations.isEmpty());
+        assertEquals(1, validateCreateGroup("Wyjazd", null).size());
     }
 
-    private User createUser() throws Exception {
-        Constructor<User> constructor = User.class.getDeclaredConstructor();
-        constructor.setAccessible(true);
-        return constructor.newInstance();
+    @Test
+    void shouldRejectGroupNameLongerThan100Characters() throws Exception {
+        assertEquals(1, validateCreateGroup("a".repeat(101), 1L).size());
+    }
+
+    @Test
+    void shouldAcceptGroupNameOf100Characters() throws Exception {
+        assertTrue(validateCreateGroup("a".repeat(100), 1L).isEmpty());
+    }
+
+    private Set<ConstraintViolation<GroupService>> validateCreateGroup(String groupName, Long userId)
+            throws NoSuchMethodException {
+        Method method = GroupService.class.getMethod("createGroup", String.class, Long.class);
+        return validator.forExecutables()
+                .validateParameters(groupService, method, new Object[]{groupName, userId});
+    }
+
+    private User createUser(Long id) {
+        User user = new User("Jan", "Kowalski", "jan@example.com", "hash");
+        ReflectionTestUtils.setField(user, "id", id);
+        return user;
     }
 }
