@@ -48,7 +48,7 @@ public class Payment {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 
-    @Column(nullable = false)
+    @Column(nullable = false, updatable = false)
     private Instant paidAt;
 
     public Payment(ExpenseGroup group, User sender, User receiver, BigDecimal amount) {
