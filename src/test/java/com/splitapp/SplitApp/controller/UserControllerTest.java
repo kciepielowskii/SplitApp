@@ -91,7 +91,9 @@ class UserControllerTest {
     @Test
     void shouldReturn409WhenDatabaseRejectsDuplicate() throws Exception {
         when(userService.register(any(RegisterUserRequest.class)))
-                .thenThrow(new DataIntegrityViolationException("duplicate key"));
+                .thenThrow(new DataIntegrityViolationException("duplicate key",
+                                new org.hibernate.exception.ConstraintViolationException(
+                                        "duplicate key", new java.sql.SQLException("duplicate", "23505"), "uk_users_email")));
 
         mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
