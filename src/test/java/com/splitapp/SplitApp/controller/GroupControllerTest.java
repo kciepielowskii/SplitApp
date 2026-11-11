@@ -3,6 +3,8 @@ package com.splitapp.SplitApp.controller;
 import com.splitapp.SplitApp.dto.GroupMemberResponse;
 import com.splitapp.SplitApp.dto.GroupResponse;
 import com.splitapp.SplitApp.entity.GroupRole;
+import com.splitapp.SplitApp.exception.BusinessRuleException;
+import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.service.GroupService;
 import org.junit.jupiter.api.Test;
@@ -144,5 +146,61 @@ class GroupControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(groupService);
+    }
+
+    @Test
+    void shouldAddMember() throws Exception {
+        GroupResponse response = new GroupResponse(1L, "Wyjazd", null, 1L,
+                List.of(new GroupMemberResponse(1L, "Jan", "Kowalski", GroupRole.OWNER),
+                        new GroupMemberResponse(2L, "Anna", "Nowak", GroupRole.MEMBER)));
+        when(groupService.addMember(1L, 2L)).thenReturn(response);
+
+        mockMvc.perform(post("/groups/1/members")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":2}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.members[1].userId").value(2))
+                .andExpect(jsonPath("$.members[1].role").value("MEMBER"));
+    }
+
+    @Test
+    void shouldRejectMissingUserIdWhenAddingMember() throws Exception {
+        mockMvc.perform(post("/groups/1/members")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.userId").exists());
+
+        verifyNoInteractions(groupService);
+    }
+
+    @Test
+    void shouldReturn404WhenAddingMemberToUnknownGroup() throws Exception {
+        when(groupService.addMember(99L, 2L))
+                .thenThrow(new GroupNotFoundException("Group not found"));
+
+        mockMvc.perform(post("/groups/99/members")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":2}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
+    @Test
+    void shouldReturn422WhenUserIsAlreadyMember() throws Exception {
+        when(groupService.addMember(1L, 2L))
+                .thenThrow(new BusinessRuleException("User is already a member of this group"));
+
+        mockMvc.perform(post("/groups/1/members")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":2}
+                                """))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.title").value("Business rule violation"));
     }
 }
