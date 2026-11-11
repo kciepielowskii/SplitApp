@@ -43,7 +43,9 @@ class GroupControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/groups/1"))
                 .andExpect(jsonPath("$.groupName").value("Wyjazd"))
-                .andExpect(jsonPath("$.members[0].role").value("OWNER"));
+                .andExpect(jsonPath("$.members[0].role").value("OWNER"))
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.createdById").value(1));
     }
 
     @Test
@@ -81,5 +83,39 @@ class GroupControllerTest {
                                 {"groupName":"Wyjazd","userId":99}
                                 """))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldRejectGroupNameLongerThan100Characters() throws Exception {
+        mockMvc.perform(post("/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"groupName":"%s","userId":1}
+                            """.formatted("a".repeat(101))))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(groupService);
+    }
+
+    @Test
+    void shouldRejectMalformedJson() throws Exception {
+        mockMvc.perform(post("/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{not json"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(groupService);
+    }
+
+    @Test
+    void shouldRejectNonNumericUserId() throws Exception {
+        mockMvc.perform(post("/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"groupName":"Wyjazd","userId":"abc"}
+                            """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(groupService);
     }
 }
