@@ -7,9 +7,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.IntStream;
+import java.math.BigInteger;
 
 public final class SplitCalculator {
     private static final long FULL_PERCENT_IN_HUNDREDTHS = 10_000;
+
+    // matches the numeric(10,2) column: 99,999,999.99
+    private static final BigInteger MAX_CENTS = BigInteger.valueOf(9_999_999_999L);
 
     private SplitCalculator() {
     }
@@ -133,10 +137,15 @@ public final class SplitCalculator {
     }
 
     private static long exactCents(BigDecimal value, String message) {
+        BigInteger unscaled;
         try {
-            return value.setScale(2, RoundingMode.UNNECESSARY).unscaledValue().longValueExact();
+            unscaled = value.setScale(2, RoundingMode.UNNECESSARY).unscaledValue();
         } catch (ArithmeticException e) {
             throw new IllegalArgumentException(message);
         }
+        if (unscaled.abs().compareTo(MAX_CENTS) > 0) {
+            throw new IllegalArgumentException("Value is too large (maximum is 99999999.99)");
+        }
+        return unscaled.longValueExact();
     }
 }
