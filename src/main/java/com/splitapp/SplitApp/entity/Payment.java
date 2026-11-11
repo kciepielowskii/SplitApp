@@ -61,6 +61,12 @@ public class Payment {
                 || (sender.getId() != null && sender.getId().equals(receiver.getId()))) {
             throw new IllegalArgumentException("Sender and receiver must differ");
         }
+        if (!group.hasMember(sender)) {
+            throw new IllegalArgumentException("Sender is not a member of this group");
+        }
+        if (!group.hasMember(receiver)) {
+            throw new IllegalArgumentException("Receiver is not a member of this group");
+        }
     }
 
     @PrePersist
