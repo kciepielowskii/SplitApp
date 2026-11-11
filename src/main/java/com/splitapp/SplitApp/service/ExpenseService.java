@@ -79,4 +79,14 @@ public class ExpenseService {
             throw new BusinessRuleException(message);
         }
     }
+
+    @Transactional(readOnly = true)
+    public List<ExpenseResponse> getExpenses(@NotNull Long groupId) {
+        if (!groupRepository.existsById(groupId)) {
+            throw new GroupNotFoundException("Group not found");
+        }
+        return expenseRepository.findAllByGroupIdOrderByCreatedAtDescIdDesc(groupId).stream()
+                .map(ExpenseResponse::from)
+                .toList();
+    }
 }
