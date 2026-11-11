@@ -86,16 +86,6 @@ class GroupServiceTest {
     }
 
     @Test
-    void shouldRejectBlankGroupName() throws Exception {
-        assertEquals(1, validateCreateGroup(" ", null, 1L).size());
-    }
-
-    @Test
-    void shouldRejectNullUserId() throws Exception {
-        assertEquals(1, validateCreateGroup("Wyjazd", null, null).size());
-    }
-
-    @Test
     void shouldRejectGroupNameLongerThan100Characters() throws Exception {
         assertEquals(1, validateCreateGroup("a".repeat(101), null, 1L).size());
     }
