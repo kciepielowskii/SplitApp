@@ -29,10 +29,12 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
+    private final GroupAccess groupAccess;
 
     @Transactional
-    public PaymentResponse createPayment(@NotNull Long groupId,
+    public PaymentResponse createPayment(@NotNull Long groupId, @NotNull Long currentUserId,
                                          @NotNull @Valid CreatePaymentRequest request) {
+        groupAccess.requireMember(groupId, currentUserId);
         ExpenseGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
 
@@ -59,10 +61,8 @@ public class PaymentService {
     }
 
     @Transactional(readOnly = true)
-    public List<PaymentResponse> getPayments(@NotNull Long groupId) {
-        if (!groupRepository.existsById(groupId)) {
-            throw new GroupNotFoundException("Group not found");
-        }
+    public List<PaymentResponse> getPayments(@NotNull Long groupId, @NotNull Long currentUserId) {
+        groupAccess.requireMember(groupId, currentUserId);
         return paymentRepository.findAllByGroupIdOrderByPaidAtDescIdDesc(groupId).stream()
                 .map(PaymentResponse::from)
                 .toList();

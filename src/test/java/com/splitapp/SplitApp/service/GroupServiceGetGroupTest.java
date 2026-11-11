@@ -4,6 +4,7 @@ import com.splitapp.SplitApp.dto.GroupResponse;
 import com.splitapp.SplitApp.entity.ExpenseGroup;
 import com.splitapp.SplitApp.entity.GroupRole;
 import com.splitapp.SplitApp.entity.User;
+import com.splitapp.SplitApp.exception.GroupAccessDeniedException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.repository.GroupRepository;
 import com.splitapp.SplitApp.repository.UserRepository;
@@ -18,17 +19,25 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class GroupServiceGetGroupTest {
     private static final Long GROUP_ID = 10L;
+    private static final Long CURRENT_USER_ID = 1L;
 
     @Mock
     private GroupRepository groupRepository;
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private GroupAccess groupAccess;
 
     @InjectMocks
     private GroupService groupService;
@@ -42,8 +51,9 @@ class GroupServiceGetGroupTest {
         ReflectionTestUtils.setField(group, "id", GROUP_ID);
         when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.of(group));
 
-        GroupResponse result = groupService.getGroup(GROUP_ID);
+        GroupResponse result = groupService.getGroup(GROUP_ID, CURRENT_USER_ID);
 
+        verify(groupAccess).requireMember(GROUP_ID, CURRENT_USER_ID);
         assertEquals(GROUP_ID, result.id());
         assertEquals("Wyjazd", result.groupName());
         assertEquals(1, result.members().size());
@@ -53,6 +63,17 @@ class GroupServiceGetGroupTest {
     void shouldThrowWhenGroupDoesNotExist() {
         when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.empty());
 
-        assertThrows(GroupNotFoundException.class, () -> groupService.getGroup(GROUP_ID));
+        assertThrows(GroupNotFoundException.class,
+                () -> groupService.getGroup(GROUP_ID, CURRENT_USER_ID));
+    }
+
+    @Test
+    void shouldNotReturnGroupWhenCallerIsNotMember() {
+        doThrow(new GroupAccessDeniedException("You are not a member of this group"))
+                .when(groupAccess).requireMember(GROUP_ID, 9L);
+
+        assertThrows(GroupAccessDeniedException.class, () -> groupService.getGroup(GROUP_ID, 9L));
+
+        verify(groupRepository, never()).findWithMembersById(any());
     }
 }

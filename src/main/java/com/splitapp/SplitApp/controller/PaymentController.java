@@ -2,10 +2,12 @@ package com.splitapp.SplitApp.controller;
 
 import com.splitapp.SplitApp.dto.CreatePaymentRequest;
 import com.splitapp.SplitApp.dto.PaymentResponse;
+import com.splitapp.SplitApp.security.AppUserDetails;
 import com.splitapp.SplitApp.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,12 +27,14 @@ public class PaymentController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public PaymentResponse createPayment(@PathVariable Long groupId,
-                                         @Valid @RequestBody CreatePaymentRequest request) {
-        return paymentService.createPayment(groupId, request);
+                                         @Valid @RequestBody CreatePaymentRequest request,
+                                         @AuthenticationPrincipal AppUserDetails currentUser) {
+        return paymentService.createPayment(groupId, currentUser.getId(), request);
     }
 
     @GetMapping
-    public List<PaymentResponse> getPayments(@PathVariable Long groupId) {
-        return paymentService.getPayments(groupId);
+    public List<PaymentResponse> getPayments(@PathVariable Long groupId,
+                                             @AuthenticationPrincipal AppUserDetails currentUser) {
+        return paymentService.getPayments(groupId, currentUser.getId());
     }
 }

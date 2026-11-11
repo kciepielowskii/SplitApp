@@ -8,6 +8,7 @@ import com.splitapp.SplitApp.entity.ExpenseCategory;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.security.SecurityConfig;
+import com.splitapp.SplitApp.security.WithMockAppUser;
 import com.splitapp.SplitApp.service.ExpenseService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -15,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -30,14 +30,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @WebMvcTest(ExpenseController.class)
 @Import(SecurityConfig.class)
-@WithMockUser
+@WithMockAppUser
 class ExpenseControllerTest {
     private static final String VALID_BODY = """
             {"amount":10.00,"category":"FOOD","description":"Obiad","paidById":1,"participantIds":[1,2]}
@@ -55,7 +55,8 @@ class ExpenseControllerTest {
                 ExpenseCategory.FOOD, "Obiad", 1L,
                 List.of(new ExpenseSplitResponse(1L, new BigDecimal("5.00")),
                         new ExpenseSplitResponse(2L, new BigDecimal("5.00"))));
-        when(expenseService.createExpense(eq(1L), any(CreateExpenseRequest.class))).thenReturn(response);
+        when(expenseService.createExpense(eq(1L), eq(1L), any(CreateExpenseRequest.class)))
+                .thenReturn(response);
 
         mockMvc.perform(post("/groups/1/expenses")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -107,7 +108,7 @@ class ExpenseControllerTest {
 
     @Test
     void shouldReturn404WhenGroupDoesNotExist() throws Exception {
-        when(expenseService.createExpense(eq(99L), any(CreateExpenseRequest.class)))
+        when(expenseService.createExpense(eq(99L), eq(1L), any(CreateExpenseRequest.class)))
                 .thenThrow(new GroupNotFoundException("Group not found"));
 
         mockMvc.perform(post("/groups/99/expenses")
@@ -120,7 +121,7 @@ class ExpenseControllerTest {
 
     @Test
     void shouldReturn422OnBusinessRuleViolation() throws Exception {
-        when(expenseService.createExpense(eq(1L), any(CreateExpenseRequest.class)))
+        when(expenseService.createExpense(eq(1L), eq(1L), any(CreateExpenseRequest.class)))
                 .thenThrow(new BusinessRuleException("Payer is not a member of this group"));
 
         mockMvc.perform(post("/groups/1/expenses")
@@ -153,7 +154,7 @@ class ExpenseControllerTest {
         ExpenseResponse response = new ExpenseResponse(5L, 1L, new BigDecimal("10.00"),
                 ExpenseCategory.FOOD, "Obiad", 1L,
                 List.of(new ExpenseSplitResponse(1L, new BigDecimal("10.00"))));
-        when(expenseService.getExpenses(1L)).thenReturn(List.of(response));
+        when(expenseService.getExpenses(1L, 1L)).thenReturn(List.of(response));
 
         mockMvc.perform(get("/groups/1/expenses"))
                 .andExpect(status().isOk())
@@ -164,7 +165,7 @@ class ExpenseControllerTest {
 
     @Test
     void shouldReturn404WhenListingExpensesOfUnknownGroup() throws Exception {
-        when(expenseService.getExpenses(99L)).thenThrow(new GroupNotFoundException("Group not found"));
+        when(expenseService.getExpenses(99L, 1L)).thenThrow(new GroupNotFoundException("Group not found"));
 
         mockMvc.perform(get("/groups/99/expenses"))
                 .andExpect(status().isNotFound())
@@ -182,7 +183,7 @@ class ExpenseControllerTest {
                 .andExpect(status().isCreated());
 
         ArgumentCaptor<CreateExpenseRequest> captor = ArgumentCaptor.forClass(CreateExpenseRequest.class);
-        verify(expenseService).createExpense(eq(1L), captor.capture());
+        verify(expenseService).createExpense(eq(1L), eq(1L), captor.capture());
         assertEquals(SplitType.AMOUNT, captor.getValue().splitType());
         assertEquals(2, captor.getValue().shares().size());
     }

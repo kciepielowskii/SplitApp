@@ -1,18 +1,15 @@
 package com.splitapp.SplitApp.exception;
 
 import com.splitapp.SplitApp.dto.RegisterUserRequest;
-import com.splitapp.SplitApp.security.SecurityConfig;
 import com.splitapp.SplitApp.service.GroupService;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.security.test.context.support.WithMockUser;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -22,8 +19,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@Import(SecurityConfig.class)
-@WithMockUser
 class GlobalExceptionHandlerTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
     private final Validator validator =
@@ -61,7 +56,7 @@ class GlobalExceptionHandlerTest {
                 "createGroup", String.class, String.class, Long.class);
 
         Set<ConstraintViolation<GroupService>> violations = validator.forExecutables()
-                .validateParameters(new GroupService(null, null), method,
+                .validateParameters(new GroupService(null, null, null), method,
                         new Object[]{" ", null, 1L});
 
         ProblemDetail result =
@@ -116,5 +111,15 @@ class GlobalExceptionHandlerTest {
         assertEquals(422, result.getStatus());
         assertEquals("Business rule violation", result.getTitle());
         assertEquals("Participants must be unique", result.getDetail());
+    }
+
+    @Test
+    void shouldReturn403WhenUserIsNotGroupMember() {
+        ProblemDetail result = handler.handleGroupAccessDenied(
+                new GroupAccessDeniedException("You are not a member of this group"));
+
+        assertEquals(403, result.getStatus());
+        assertEquals("Forbidden", result.getTitle());
+        assertEquals("You are not a member of this group", result.getDetail());
     }
 }

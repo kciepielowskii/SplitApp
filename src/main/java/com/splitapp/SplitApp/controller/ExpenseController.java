@@ -2,10 +2,12 @@ package com.splitapp.SplitApp.controller;
 
 import com.splitapp.SplitApp.dto.CreateExpenseRequest;
 import com.splitapp.SplitApp.dto.ExpenseResponse;
+import com.splitapp.SplitApp.security.AppUserDetails;
 import com.splitapp.SplitApp.service.ExpenseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,12 +27,14 @@ public class ExpenseController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ExpenseResponse createExpense(@PathVariable Long groupId,
-                                         @Valid @RequestBody CreateExpenseRequest request) {
-        return expenseService.createExpense(groupId, request);
+                                         @Valid @RequestBody CreateExpenseRequest request,
+                                         @AuthenticationPrincipal AppUserDetails currentUser) {
+        return expenseService.createExpense(groupId, currentUser.getId(), request);
     }
 
     @GetMapping
-    public List<ExpenseResponse> getExpenses(@PathVariable Long groupId) {
-        return expenseService.getExpenses(groupId);
+    public List<ExpenseResponse> getExpenses(@PathVariable Long groupId,
+                                             @AuthenticationPrincipal AppUserDetails currentUser) {
+        return expenseService.getExpenses(groupId, currentUser.getId());
     }
 }

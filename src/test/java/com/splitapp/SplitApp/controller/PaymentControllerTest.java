@@ -5,13 +5,13 @@ import com.splitapp.SplitApp.dto.PaymentResponse;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.security.SecurityConfig;
+import com.splitapp.SplitApp.security.WithMockAppUser;
 import com.splitapp.SplitApp.service.PaymentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(PaymentController.class)
 @Import(SecurityConfig.class)
-@WithMockUser
+@WithMockAppUser
 class PaymentControllerTest {
     private static final String VALID_BODY = """
             {"senderId":1,"receiverId":2,"amount":10.00}
@@ -46,7 +46,8 @@ class PaymentControllerTest {
     void shouldCreatePayment() throws Exception {
         PaymentResponse response = new PaymentResponse(7L, 1L, 1L, 2L,
                 new BigDecimal("10.00"), Instant.parse("2026-11-11T12:00:00Z"));
-        when(paymentService.createPayment(eq(1L), any(CreatePaymentRequest.class))).thenReturn(response);
+        when(paymentService.createPayment(eq(1L), eq(1L), any(CreatePaymentRequest.class)))
+                .thenReturn(response);
 
         mockMvc.perform(post("/groups/1/payments")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +87,7 @@ class PaymentControllerTest {
 
     @Test
     void shouldReturn404WhenGroupDoesNotExist() throws Exception {
-        when(paymentService.createPayment(eq(99L), any(CreatePaymentRequest.class)))
+        when(paymentService.createPayment(eq(99L), eq(1L), any(CreatePaymentRequest.class)))
                 .thenThrow(new GroupNotFoundException("Group not found"));
 
         mockMvc.perform(post("/groups/99/payments")
@@ -98,7 +99,7 @@ class PaymentControllerTest {
 
     @Test
     void shouldReturn422OnBusinessRuleViolation() throws Exception {
-        when(paymentService.createPayment(eq(1L), any(CreatePaymentRequest.class)))
+        when(paymentService.createPayment(eq(1L), eq(1L), any(CreatePaymentRequest.class)))
                 .thenThrow(new BusinessRuleException("Sender and receiver must differ"));
 
         mockMvc.perform(post("/groups/1/payments")
@@ -113,7 +114,7 @@ class PaymentControllerTest {
     void shouldReturnGroupPayments() throws Exception {
         PaymentResponse response = new PaymentResponse(7L, 1L, 1L, 2L,
                 new BigDecimal("10.00"), Instant.parse("2026-11-11T12:00:00Z"));
-        when(paymentService.getPayments(1L)).thenReturn(List.of(response));
+        when(paymentService.getPayments(1L, 1L)).thenReturn(List.of(response));
 
         mockMvc.perform(get("/groups/1/payments"))
                 .andExpect(status().isOk())
@@ -124,7 +125,7 @@ class PaymentControllerTest {
 
     @Test
     void shouldReturn404WhenListingPaymentsOfUnknownGroup() throws Exception {
-        when(paymentService.getPayments(99L)).thenThrow(new GroupNotFoundException("Group not found"));
+        when(paymentService.getPayments(99L, 1L)).thenThrow(new GroupNotFoundException("Group not found"));
 
         mockMvc.perform(get("/groups/99/payments"))
                 .andExpect(status().isNotFound())

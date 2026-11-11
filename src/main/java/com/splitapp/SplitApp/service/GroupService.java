@@ -23,6 +23,7 @@ import org.springframework.validation.annotation.Validated;
 public class GroupService {
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
+    private final GroupAccess groupAccess;
 
     @Transactional
     public GroupResponse createGroup(@NotBlank @Size(max = 100) String groupName,
@@ -37,7 +38,9 @@ public class GroupService {
     }
 
     @Transactional
-    public GroupResponse addMember(@NotNull Long groupId, @NotNull Long userId) {
+    public GroupResponse addMember(@NotNull Long groupId, @NotNull Long currentUserId,
+                                   @NotNull Long userId) {
+        groupAccess.requireMember(groupId, currentUserId);
         ExpenseGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
         User user = userRepository.findById(userId)
@@ -52,7 +55,8 @@ public class GroupService {
     }
 
     @Transactional(readOnly = true)
-    public GroupResponse getGroup(@NotNull Long groupId) {
+    public GroupResponse getGroup(@NotNull Long groupId, @NotNull Long currentUserId) {
+        groupAccess.requireMember(groupId, currentUserId);
         return groupRepository.findWithMembersById(groupId)
                 .map(GroupResponse::from)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));

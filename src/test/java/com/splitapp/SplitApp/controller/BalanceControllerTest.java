@@ -5,13 +5,13 @@ import com.splitapp.SplitApp.dto.MemberBalanceResponse;
 import com.splitapp.SplitApp.dto.SettlementTransferResponse;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.security.SecurityConfig;
+import com.splitapp.SplitApp.security.WithMockAppUser;
 import com.splitapp.SplitApp.service.BalanceService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithAnonymousUser;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(BalanceController.class)
 @Import(SecurityConfig.class)
-@WithMockUser
+@WithMockAppUser
 class BalanceControllerTest {
     @Autowired
     private MockMvc mockMvc;
@@ -41,7 +41,7 @@ class BalanceControllerTest {
                 List.of(new MemberBalanceResponse(1L, "Jan", "Kowalski", new BigDecimal("5.00")),
                         new MemberBalanceResponse(2L, "Anna", "Nowak", new BigDecimal("-5.00"))),
                 List.of(new SettlementTransferResponse(2L, 1L, new BigDecimal("5.00"))));
-        when(balanceService.getBalances(1L)).thenReturn(response);
+        when(balanceService.getBalances(1L, 1L)).thenReturn(response);
 
         mockMvc.perform(get("/groups/1/balances"))
                 .andExpect(status().isOk())
@@ -54,7 +54,7 @@ class BalanceControllerTest {
 
     @Test
     void shouldReturn404WhenGroupDoesNotExist() throws Exception {
-        when(balanceService.getBalances(99L)).thenThrow(new GroupNotFoundException("Group not found"));
+        when(balanceService.getBalances(99L, 1L)).thenThrow(new GroupNotFoundException("Group not found"));
 
         mockMvc.perform(get("/groups/99/balances"))
                 .andExpect(status().isNotFound())
