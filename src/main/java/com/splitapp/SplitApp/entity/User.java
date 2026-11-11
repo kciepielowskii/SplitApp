@@ -16,6 +16,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.Locale;
+import java.util.Objects;
 
 @Entity
 @Table(name = "users")
@@ -45,7 +47,6 @@ public class User {
     @NotBlank(message = "Email is required")
     @Size(max = 255)
     @Getter
-    @Setter
     private String email;
 
     @Column(nullable = false, length = 120)
@@ -59,5 +60,22 @@ public class User {
     @PrePersist
     protected void onCreate() {
         this.createdAt = Instant.now();
+    }
+
+    public User(String firstName, String lastName, String email, String passwordHash) {
+        this.firstName = Objects.requireNonNull(firstName, "First name is required");
+        this.lastName = Objects.requireNonNull(lastName, "Last name is required");
+        this.email = normalizeEmail(email);
+        this.password = Objects.requireNonNull(passwordHash, "Password hash is required");
+    }
+
+    public void setEmail(String email) {
+        this.email = normalizeEmail(email);
+    }
+
+    private static String normalizeEmail(String email) {
+        return Objects.requireNonNull(email, "Email is required")
+                .trim()
+                .toLowerCase(Locale.ROOT);
     }
 }
