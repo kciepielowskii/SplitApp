@@ -74,6 +74,12 @@ public class ExpenseGroup {
                 .anyMatch(member -> User.sameUser(member.getUser(), user));
     }
 
+    public boolean isOwner(Long userId) {
+        return members.stream()
+                .anyMatch(member -> member.getRole() == GroupRole.OWNER
+                        && Objects.equals(member.getUser().getId(), userId));
+    }
+
     public GroupMember addMember(User user, GroupRole role) {
         Objects.requireNonNull(user, "User is required");
         Objects.requireNonNull(role, "Role is required");

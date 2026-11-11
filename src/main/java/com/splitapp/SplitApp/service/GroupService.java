@@ -9,6 +9,7 @@ import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.repository.GroupRepository;
 import com.splitapp.SplitApp.repository.UserRepository;
+import com.splitapp.SplitApp.exception.GroupAccessDeniedException;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -41,8 +42,13 @@ public class GroupService {
     public GroupResponse addMember(@NotNull Long groupId, @NotNull Long currentUserId,
                                    @NotNull Long userId) {
         groupAccess.requireMember(groupId, currentUserId);
-        ExpenseGroup group = groupRepository.findById(groupId)
+        ExpenseGroup group = groupRepository.findWithMembersById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
+
+        if (!group.isOwner(currentUserId)) {
+            throw new GroupAccessDeniedException("Only the group owner can add members");
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 

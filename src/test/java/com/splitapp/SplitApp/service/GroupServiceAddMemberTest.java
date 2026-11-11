@@ -50,7 +50,7 @@ class GroupServiceAddMemberTest {
     void shouldAddUserAsMember() {
         User owner = user(1L);
         User newcomer = user(2L);
-        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(owner)));
+        when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.of(group(owner)));
         when(userRepository.findById(2L)).thenReturn(Optional.of(newcomer));
 
         GroupResponse result = groupService.addMember(GROUP_ID, CURRENT_USER_ID, 2L);
@@ -64,7 +64,7 @@ class GroupServiceAddMemberTest {
 
     @Test
     void shouldThrowWhenGroupDoesNotExist() {
-        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.empty());
+        when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.empty());
 
         assertThrows(GroupNotFoundException.class,
                 () -> groupService.addMember(GROUP_ID, CURRENT_USER_ID, 2L));
@@ -72,7 +72,7 @@ class GroupServiceAddMemberTest {
 
     @Test
     void shouldThrowWhenUserDoesNotExist() {
-        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(user(1L))));
+        when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.of(group(user(1L))));
         when(userRepository.findById(2L)).thenReturn(Optional.empty());
 
         assertThrows(UserNotFoundException.class,
@@ -82,7 +82,7 @@ class GroupServiceAddMemberTest {
     @Test
     void shouldRejectUserWhoIsAlreadyMember() {
         User owner = user(1L);
-        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(owner)));
+        when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.of(group(owner)));
         when(userRepository.findById(1L)).thenReturn(Optional.of(owner));
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class,
@@ -100,13 +100,27 @@ class GroupServiceAddMemberTest {
                 () -> groupService.addMember(GROUP_ID, 9L, 2L));
 
         verifyNoInteractions(userRepository);
-        verify(groupRepository, never()).findById(any());
+        verify(groupRepository, never()).findWithMembersById(GROUP_ID);
     }
 
     private static User user(Long id) {
         User user = new User("Jan", "Kowalski", "jan" + id + "@example.com", "hash");
         ReflectionTestUtils.setField(user, "id", id);
         return user;
+    }
+
+    @Test
+    void shouldRejectAddingMemberWhenCallerIsNotOwner() {
+        User owner = user(1L);
+        ExpenseGroup group = group(owner);
+        group.addMember(user(3L), GroupRole.MEMBER);
+        when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.of(group));
+
+        GroupAccessDeniedException ex = assertThrows(GroupAccessDeniedException.class,
+                () -> groupService.addMember(GROUP_ID, 3L, 2L));
+
+        assertEquals("Only the group owner can add members", ex.getMessage());
+        verifyNoInteractions(userRepository);
     }
 
     private static ExpenseGroup group(User owner) {

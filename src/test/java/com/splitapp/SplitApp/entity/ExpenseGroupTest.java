@@ -5,8 +5,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 class ExpenseGroupTest {
@@ -70,5 +72,24 @@ class ExpenseGroupTest {
 
         assertThrows(UnsupportedOperationException.class,
                 () -> group.getMembers().add(member));
+    }
+
+    @Test
+    void shouldRecognizeOwner() {
+        ExpenseGroup group = new ExpenseGroup("Wyjazd", creator);
+        group.addMember(user(1L), GroupRole.OWNER);
+        group.addMember(user(2L), GroupRole.MEMBER);
+
+        assertTrue(group.isOwner(1L));
+    }
+
+    @Test
+    void shouldNotTreatRegularMemberOrOutsiderAsOwner() {
+        ExpenseGroup group = new ExpenseGroup("Wyjazd", creator);
+        group.addMember(user(1L), GroupRole.OWNER);
+        group.addMember(user(2L), GroupRole.MEMBER);
+
+        assertFalse(group.isOwner(2L));
+        assertFalse(group.isOwner(3L));
     }
 }

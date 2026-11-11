@@ -11,6 +11,7 @@ import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.repository.GroupRepository;
 import com.splitapp.SplitApp.repository.PaymentRepository;
 import com.splitapp.SplitApp.repository.UserRepository;
+import com.splitapp.SplitApp.exception.GroupAccessDeniedException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,13 @@ public class PaymentService {
     public PaymentResponse createPayment(@NotNull Long groupId, @NotNull Long currentUserId,
                                          @NotNull @Valid CreatePaymentRequest request) {
         groupAccess.requireMember(groupId, currentUserId);
+
+        if (!currentUserId.equals(request.senderId())
+                && !currentUserId.equals(request.receiverId())) {
+            throw new GroupAccessDeniedException(
+                    "You can only record payments you are part of");
+        }
+
         ExpenseGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
 
