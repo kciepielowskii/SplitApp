@@ -847,6 +847,48 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.title").value("Group not found"));
     }
 
+    @Test
+    void shouldNotDeleteEntriesThatInvolveAFormerMember() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        long expenseId = createSharedExpense(groupId, owner, friend, "10.00");
+        // recorded by the receiver, so it counts at once and the friend can leave
+        long paymentId = idOf(send(owner, "/groups/%d/payments".formatted(groupId), """
+                {"senderId":%d,"receiverId":%d,"amount":5.00}
+                """.formatted(friend.id(), owner.id()))
+                .andExpect(status().isCreated())
+                .andReturn());
+        send(friend, "/groups/%d/leave".formatted(groupId), "").andExpect(status().isNoContent());
+
+        remove(owner, "/groups/%d/expenses/%d".formatted(groupId, expenseId))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value(
+                        "Cannot delete an expense that involves a user who has left the group"));
+        remove(owner, "/groups/%d/payments/%d".formatted(groupId, paymentId))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value(
+                        "Cannot delete a payment that involves a user who has left the group"));
+
+        // nothing was removed, so the balances still add up
+        fetch(owner, "/groups/%d/expenses".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+        fetch(owner, "/groups/%d/payments".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+        fetch(owner, "/groups/%d/balances".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balances[0].balance").value(0.0))
+                .andExpect(jsonPath("$.transfers.length()").value(0));
+
+        // entries that do not involve the former member can still be deleted
+        long ownExpenseId = createExpense(groupId, owner, "7.00");
+        remove(owner, "/groups/%d/expenses/%d".formatted(groupId, ownExpenseId))
+                .andExpect(status().isNoContent());
+    }
+
     private record TestUser(long id, String email) {
     }
 

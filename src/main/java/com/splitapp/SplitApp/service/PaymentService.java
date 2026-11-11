@@ -91,8 +91,17 @@ public class PaymentService {
             throw new GroupAccessDeniedException(
                     "Only the author or the group owner can delete this payment");
         }
+        if (involvesFormerMember(payment)) {
+            throw new BusinessRuleException(
+                    "Cannot delete a payment that involves a user who has left the group");
+        }
 
         paymentRepository.delete(payment);
+    }
+
+    private static boolean involvesFormerMember(Payment payment) {
+        ExpenseGroup group = payment.getGroup();
+        return !group.hasMember(payment.getSender()) || !group.hasMember(payment.getReceiver());
     }
 
     @Transactional

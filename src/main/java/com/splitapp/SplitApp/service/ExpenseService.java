@@ -142,7 +142,18 @@ public class ExpenseService {
             throw new GroupAccessDeniedException(
                     "Only the author or the group owner can delete this expense");
         }
+        if (involvesFormerMember(expense)) {
+            throw new BusinessRuleException(
+                    "Cannot delete an expense that involves a user who has left the group");
+        }
 
         expenseRepository.delete(expense);
+    }
+
+    private static boolean involvesFormerMember(Expense expense) {
+        ExpenseGroup group = expense.getGroup();
+        return !group.hasMember(expense.getPaidBy())
+                || expense.getSplits().stream()
+                .anyMatch(split -> !group.hasMember(split.getUser()));
     }
 }

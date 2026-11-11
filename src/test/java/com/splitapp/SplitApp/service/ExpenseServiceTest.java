@@ -381,6 +381,78 @@ class ExpenseServiceTest {
     }
 
     @Test
+    void shouldDeleteExpenseWithSplitsWhenEveryoneIsStillMember() {
+        User owner = user(1L);
+        User author = user(2L);
+        User friend = user(3L);
+        ExpenseGroup group = groupWithOwner(owner, author, friend);
+        Expense expense = expenseBy(author, group);
+        expense.addSplit(new ExpenseSplit(author, new BigDecimal("5.00")));
+        expense.addSplit(new ExpenseSplit(friend, new BigDecimal("5.00")));
+        when(expenseRepository.findByIdAndGroupId(5L, GROUP_ID)).thenReturn(Optional.of(expense));
+
+        expenseService.deleteExpense(GROUP_ID, 2L, 5L);
+
+        verify(expenseRepository).delete(expense);
+    }
+
+    @Test
+    void shouldRejectDeletingExpenseWhenPayerHasLeft() {
+        User owner = user(1L);
+        User author = user(2L);
+        User payer = user(3L);
+        ExpenseGroup group = groupWithOwner(owner, author, payer);
+        Expense expense = new Expense(new BigDecimal("10.00"), ExpenseCategory.FOOD, "Obiad",
+                group, payer, author);
+        expense.addSplit(new ExpenseSplit(author, new BigDecimal("10.00")));
+        group.removeMember(3L);
+        when(expenseRepository.findByIdAndGroupId(5L, GROUP_ID)).thenReturn(Optional.of(expense));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> expenseService.deleteExpense(GROUP_ID, 2L, 5L));
+
+        assertEquals("Cannot delete an expense that involves a user who has left the group",
+                ex.getMessage());
+        verify(expenseRepository, never()).delete(any(Expense.class));
+    }
+
+    @Test
+    void shouldRejectDeletingExpenseWhenParticipantHasLeft() {
+        User owner = user(1L);
+        User author = user(2L);
+        User friend = user(3L);
+        ExpenseGroup group = groupWithOwner(owner, author, friend);
+        Expense expense = expenseBy(author, group);
+        expense.addSplit(new ExpenseSplit(author, new BigDecimal("5.00")));
+        expense.addSplit(new ExpenseSplit(friend, new BigDecimal("5.00")));
+        group.removeMember(3L);
+        when(expenseRepository.findByIdAndGroupId(5L, GROUP_ID)).thenReturn(Optional.of(expense));
+
+        assertThrows(BusinessRuleException.class,
+                () -> expenseService.deleteExpense(GROUP_ID, 1L, 5L));
+
+        verify(expenseRepository, never()).delete(any(Expense.class));
+    }
+
+    @Test
+    void shouldReportMissingPermissionBeforeFormerMemberProblem() {
+        User owner = user(1L);
+        User author = user(2L);
+        User payer = user(3L);
+        User other = user(4L);
+        ExpenseGroup group = groupWithOwner(owner, author, payer, other);
+        Expense expense = new Expense(new BigDecimal("10.00"), ExpenseCategory.FOOD, "Obiad",
+                group, payer, author);
+        group.removeMember(3L);
+        when(expenseRepository.findByIdAndGroupId(5L, GROUP_ID)).thenReturn(Optional.of(expense));
+
+        assertThrows(GroupAccessDeniedException.class,
+                () -> expenseService.deleteExpense(GROUP_ID, 4L, 5L));
+
+        verify(expenseRepository, never()).delete(any(Expense.class));
+    }
+
+    @Test
     void shouldThrowWhenDeletingUnknownExpense() {
         when(expenseRepository.findByIdAndGroupId(99L, GROUP_ID)).thenReturn(Optional.empty());
 
