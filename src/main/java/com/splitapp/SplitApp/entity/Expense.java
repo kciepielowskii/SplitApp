@@ -25,6 +25,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -79,9 +80,17 @@ public class Expense {
         this.paidBy = Objects.requireNonNull(paidBy, "Payer is required");
     }
 
+    public List<ExpenseSplit> getSplits() {
+        return Collections.unmodifiableList(splits);
+    }
+
     public void addSplit(ExpenseSplit split) {
-        if (split == null) {
-            throw new IllegalArgumentException("Split cannot be null");
+        Objects.requireNonNull(split, "Split is required");
+
+        boolean duplicate = splits.stream()
+                .anyMatch(existing -> User.sameUser(existing.getUser(), split.getUser()));
+        if (duplicate) {
+            throw new IllegalArgumentException("User already has a split for this expense");
         }
 
         splits.add(split);

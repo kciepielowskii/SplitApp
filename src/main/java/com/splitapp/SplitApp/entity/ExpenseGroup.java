@@ -20,6 +20,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -48,7 +49,6 @@ public class ExpenseGroup {
     private User createdBy;
 
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Getter
     private List<GroupMember> members = new ArrayList<>();
 
     @Column(nullable = false, updatable = false)
@@ -70,8 +70,21 @@ public class ExpenseGroup {
     }
 
     public GroupMember addMember(User user, GroupRole role) {
+        Objects.requireNonNull(user, "User is required");
+        Objects.requireNonNull(role, "Role is required");
+
+        boolean alreadyMember = members.stream()
+                .anyMatch(member -> User.sameUser(member.getUser(), user));
+        if (alreadyMember) {
+            throw new IllegalArgumentException("User is already a member of this group");
+        }
+
         GroupMember member = new GroupMember(this, user, role);
         members.add(member);
         return member;
+    }
+
+    public List<GroupMember> getMembers() {
+        return Collections.unmodifiableList(members);
     }
 }

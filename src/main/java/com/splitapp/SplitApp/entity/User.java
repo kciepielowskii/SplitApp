@@ -78,4 +78,10 @@ public class User {
                 .trim()
                 .toLowerCase(Locale.ROOT);
     }
+
+    static boolean sameUser(User first, User second) {
+        return first == second
+                || (first != null && second != null
+                && first.getId() != null && first.getId().equals(second.getId()));
+    }
 }
