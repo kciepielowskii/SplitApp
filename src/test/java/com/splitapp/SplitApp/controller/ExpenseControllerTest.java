@@ -6,6 +6,8 @@ import com.splitapp.SplitApp.dto.ExpenseSplitResponse;
 import com.splitapp.SplitApp.dto.SplitType;
 import com.splitapp.SplitApp.entity.ExpenseCategory;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
+import com.splitapp.SplitApp.exception.ExpenseNotFoundException;
+import com.splitapp.SplitApp.exception.GroupAccessDeniedException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.security.SecurityConfig;
 import com.splitapp.SplitApp.security.WithMockAppUser;
@@ -27,9 +29,11 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -208,5 +212,33 @@ class ExpenseControllerTest {
                 .andExpect(jsonPath("$.title").value("Validation failed"));
 
         verifyNoInteractions(expenseService);
+    }
+
+    @Test
+    void shouldDeleteExpense() throws Exception {
+        mockMvc.perform(delete("/groups/1/expenses/5"))
+                .andExpect(status().isNoContent());
+
+        verify(expenseService).deleteExpense(1L, 1L, 5L);
+    }
+
+    @Test
+    void shouldReturn404WhenDeletingUnknownExpense() throws Exception {
+        doThrow(new ExpenseNotFoundException("Expense not found"))
+                .when(expenseService).deleteExpense(1L, 1L, 99L);
+
+        mockMvc.perform(delete("/groups/1/expenses/99"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Expense not found"));
+    }
+
+    @Test
+    void shouldReturn403WhenDeletingSomeoneElsesExpense() throws Exception {
+        doThrow(new GroupAccessDeniedException("Only the author or the group owner can delete this expense"))
+                .when(expenseService).deleteExpense(1L, 1L, 5L);
+
+        mockMvc.perform(delete("/groups/1/expenses/5"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"));
     }
 }

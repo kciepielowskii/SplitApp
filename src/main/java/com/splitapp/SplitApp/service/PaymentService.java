@@ -7,6 +7,7 @@ import com.splitapp.SplitApp.entity.Payment;
 import com.splitapp.SplitApp.entity.User;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
+import com.splitapp.SplitApp.exception.PaymentNotFoundException;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.repository.GroupRepository;
 import com.splitapp.SplitApp.repository.PaymentRepository;
@@ -75,5 +76,21 @@ public class PaymentService {
         return paymentRepository.findAllByGroupIdOrderByPaidAtDescIdDesc(groupId).stream()
                 .map(PaymentResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public void deletePayment(@NotNull Long groupId, @NotNull Long currentUserId,
+                              @NotNull Long paymentId) {
+        groupAccess.requireMember(groupId, currentUserId);
+        Payment payment = paymentRepository.findByIdAndGroupId(paymentId, groupId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found"));
+
+        boolean isAuthor = payment.getCreatedBy().getId().equals(currentUserId);
+        if (!isAuthor && !payment.getGroup().isOwner(currentUserId)) {
+            throw new GroupAccessDeniedException(
+                    "Only the author or the group owner can delete this payment");
+        }
+
+        paymentRepository.delete(payment);
     }
 }

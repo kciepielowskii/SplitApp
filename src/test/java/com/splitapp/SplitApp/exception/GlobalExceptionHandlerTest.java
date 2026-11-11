@@ -158,6 +158,24 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void shouldReturnNotFoundForMissingExpense() {
+        ProblemDetail result =
+                handler.handleExpenseNotFound(new ExpenseNotFoundException("Expense not found"));
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), result.getStatus());
+        assertEquals("Expense not found", result.getTitle());
+    }
+
+    @Test
+    void shouldReturnNotFoundForMissingPayment() {
+        ProblemDetail result =
+                handler.handlePaymentNotFound(new PaymentNotFoundException("Payment not found"));
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), result.getStatus());
+        assertEquals("Payment not found", result.getTitle());
+    }
+
+    @Test
     void shouldReturn422ForBusinessRuleViolation() {
         ProblemDetail result =
                 handler.handleBusinessRule(new BusinessRuleException("Participants must be unique"));

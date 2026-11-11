@@ -3,7 +3,9 @@ package com.splitapp.SplitApp.controller;
 import com.splitapp.SplitApp.dto.CreatePaymentRequest;
 import com.splitapp.SplitApp.dto.PaymentResponse;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
+import com.splitapp.SplitApp.exception.GroupAccessDeniedException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
+import com.splitapp.SplitApp.exception.PaymentNotFoundException;
 import com.splitapp.SplitApp.security.SecurityConfig;
 import com.splitapp.SplitApp.security.WithMockAppUser;
 import com.splitapp.SplitApp.service.PaymentService;
@@ -21,8 +23,11 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -131,5 +136,33 @@ class PaymentControllerTest {
         mockMvc.perform(get("/groups/99/payments"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
+    @Test
+    void shouldDeletePayment() throws Exception {
+        mockMvc.perform(delete("/groups/1/payments/7"))
+                .andExpect(status().isNoContent());
+
+        verify(paymentService).deletePayment(1L, 1L, 7L);
+    }
+
+    @Test
+    void shouldReturn404WhenDeletingUnknownPayment() throws Exception {
+        doThrow(new PaymentNotFoundException("Payment not found"))
+                .when(paymentService).deletePayment(1L, 1L, 99L);
+
+        mockMvc.perform(delete("/groups/1/payments/99"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Payment not found"));
+    }
+
+    @Test
+    void shouldReturn403WhenDeletingSomeoneElsesPayment() throws Exception {
+        doThrow(new GroupAccessDeniedException("Only the author or the group owner can delete this payment"))
+                .when(paymentService).deletePayment(1L, 1L, 7L);
+
+        mockMvc.perform(delete("/groups/1/payments/7"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"));
     }
 }

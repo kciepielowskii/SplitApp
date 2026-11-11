@@ -91,6 +91,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.NOT_FOUND, "Group not found", exception.getMessage());
     }
 
+    @ExceptionHandler(ExpenseNotFoundException.class)
+    public ProblemDetail handleExpenseNotFound(ExpenseNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, "Expense not found", exception.getMessage());
+    }
+
+    @ExceptionHandler(PaymentNotFoundException.class)
+    public ProblemDetail handlePaymentNotFound(PaymentNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, "Payment not found", exception.getMessage());
+    }
+
     @ExceptionHandler(GroupAccessDeniedException.class)
     public ProblemDetail handleGroupAccessDenied(GroupAccessDeniedException exception) {
         return problem(HttpStatus.FORBIDDEN, "Forbidden", exception.getMessage());

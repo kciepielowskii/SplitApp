@@ -12,6 +12,7 @@ import com.splitapp.SplitApp.entity.ExpenseSplit;
 import com.splitapp.SplitApp.entity.GroupRole;
 import com.splitapp.SplitApp.entity.User;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
+import com.splitapp.SplitApp.exception.ExpenseNotFoundException;
 import com.splitapp.SplitApp.exception.GroupAccessDeniedException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
@@ -339,6 +340,67 @@ class ExpenseServiceTest {
         verifyNoInteractions(expenseRepository);
     }
 
+    @Test
+    void shouldDeleteExpenseWhenCallerIsAuthor() {
+        User owner = user(1L);
+        User author = user(2L);
+        Expense expense = expenseBy(author, groupWithOwner(owner, author));
+        when(expenseRepository.findByIdAndGroupId(5L, GROUP_ID)).thenReturn(Optional.of(expense));
+
+        expenseService.deleteExpense(GROUP_ID, 2L, 5L);
+
+        verify(groupAccess).requireMember(GROUP_ID, 2L);
+        verify(expenseRepository).delete(expense);
+    }
+
+    @Test
+    void shouldDeleteExpenseWhenCallerIsGroupOwner() {
+        User owner = user(1L);
+        User author = user(2L);
+        Expense expense = expenseBy(author, groupWithOwner(owner, author));
+        when(expenseRepository.findByIdAndGroupId(5L, GROUP_ID)).thenReturn(Optional.of(expense));
+
+        expenseService.deleteExpense(GROUP_ID, 1L, 5L);
+
+        verify(expenseRepository).delete(expense);
+    }
+
+    @Test
+    void shouldRejectDeletingExpenseWhenCallerIsNeitherAuthorNorOwner() {
+        User owner = user(1L);
+        User author = user(2L);
+        User other = user(3L);
+        Expense expense = expenseBy(author, groupWithOwner(owner, author, other));
+        when(expenseRepository.findByIdAndGroupId(5L, GROUP_ID)).thenReturn(Optional.of(expense));
+
+        GroupAccessDeniedException ex = assertThrows(GroupAccessDeniedException.class,
+                () -> expenseService.deleteExpense(GROUP_ID, 3L, 5L));
+
+        assertEquals("Only the author or the group owner can delete this expense", ex.getMessage());
+        verify(expenseRepository, never()).delete(any(Expense.class));
+    }
+
+    @Test
+    void shouldThrowWhenDeletingUnknownExpense() {
+        when(expenseRepository.findByIdAndGroupId(99L, GROUP_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ExpenseNotFoundException.class,
+                () -> expenseService.deleteExpense(GROUP_ID, CURRENT_USER_ID, 99L));
+
+        verify(expenseRepository, never()).delete(any(Expense.class));
+    }
+
+    @Test
+    void shouldNotDeleteExpenseWhenCallerIsNotMember() {
+        doThrow(new GroupAccessDeniedException("You are not a member of this group"))
+                .when(groupAccess).requireMember(GROUP_ID, 9L);
+
+        assertThrows(GroupAccessDeniedException.class,
+                () -> expenseService.deleteExpense(GROUP_ID, 9L, 5L));
+
+        verifyNoInteractions(expenseRepository);
+    }
+
     private static CreateExpenseRequest request(String amount, Long paidById, List<Long> participantIds) {
         return new CreateExpenseRequest(new BigDecimal(amount), ExpenseCategory.FOOD, "Obiad",
                 paidById, null, participantIds, null);
@@ -363,5 +425,19 @@ class ExpenseServiceTest {
         }
         ReflectionTestUtils.setField(group, "id", GROUP_ID);
         return group;
+    }
+
+    private static ExpenseGroup groupWithOwner(User owner, User... others) {
+        ExpenseGroup group = new ExpenseGroup("Wyjazd", owner);
+        group.addMember(owner, GroupRole.OWNER);
+        for (User other : others) {
+            group.addMember(other, GroupRole.MEMBER);
+        }
+        ReflectionTestUtils.setField(group, "id", GROUP_ID);
+        return group;
+    }
+
+    private static Expense expenseBy(User author, ExpenseGroup group) {
+        return new Expense(new BigDecimal("10.00"), ExpenseCategory.FOOD, "Obiad", group, author, author);
     }
 }
