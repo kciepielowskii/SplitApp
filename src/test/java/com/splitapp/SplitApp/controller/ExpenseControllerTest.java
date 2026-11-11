@@ -3,11 +3,13 @@ package com.splitapp.SplitApp.controller;
 import com.splitapp.SplitApp.dto.CreateExpenseRequest;
 import com.splitapp.SplitApp.dto.ExpenseResponse;
 import com.splitapp.SplitApp.dto.ExpenseSplitResponse;
+import com.splitapp.SplitApp.dto.SplitType;
 import com.splitapp.SplitApp.entity.ExpenseCategory;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.service.ExpenseService;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -19,8 +21,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -69,8 +73,7 @@ class ExpenseControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("Validation failed"))
                 .andExpect(jsonPath("$.errors.amount").exists())
-                .andExpect(jsonPath("$.errors.paidById").exists())
-                .andExpect(jsonPath("$.errors.participantIds").exists());
+                .andExpect(jsonPath("$.errors.paidById").exists());
 
         verifyNoInteractions(expenseService);
     }
@@ -161,5 +164,42 @@ class ExpenseControllerTest {
         mockMvc.perform(get("/groups/99/expenses"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
+    @Test
+    void shouldAcceptAmountSplitWithShares() throws Exception {
+        mockMvc.perform(post("/groups/1/expenses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":10.00,"category":"FOOD","paidById":1,"splitType":"AMOUNT",
+                                 "shares":[{"userId":1,"value":3.00},{"userId":2,"value":7.00}]}
+                                """))
+                .andExpect(status().isCreated());
+
+        ArgumentCaptor<CreateExpenseRequest> captor = ArgumentCaptor.forClass(CreateExpenseRequest.class);
+        verify(expenseService).createExpense(eq(1L), captor.capture());
+        assertEquals(SplitType.AMOUNT, captor.getValue().splitType());
+        assertEquals(2, captor.getValue().shares().size());
+    }
+
+    @Test
+    void shouldRejectUnknownSplitTypeAndShareWithoutValue() throws Exception {
+        mockMvc.perform(post("/groups/1/expenses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":10.00,"category":"FOOD","paidById":1,"splitType":"WHATEVER",
+                                 "shares":[{"userId":1,"value":10.00}]}
+                                """))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/groups/1/expenses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":10.00,"category":"FOOD","paidById":1,"splitType":"AMOUNT",
+                                 "shares":[{"userId":1}]}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Validation failed"));
+
+        verifyNoInteractions(expenseService);
     }
 }

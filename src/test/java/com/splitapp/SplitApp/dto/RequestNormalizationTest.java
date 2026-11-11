@@ -29,11 +29,19 @@ class RequestNormalizationTest {
     @Test
     void shouldTrimExpenseDescriptionAndTurnBlankIntoNull() {
         CreateExpenseRequest trimmed = new CreateExpenseRequest(BigDecimal.TEN,
-                ExpenseCategory.FOOD, "  Obiad ", 1L, List.of(1L));
+                ExpenseCategory.FOOD, "  Obiad ", 1L, null, List.of(1L), null);
         CreateExpenseRequest blank = new CreateExpenseRequest(BigDecimal.TEN,
-                ExpenseCategory.FOOD, "  ", 1L, List.of(1L));
+                ExpenseCategory.FOOD, "  ", 1L, null, List.of(1L), null);
 
         assertEquals("Obiad", trimmed.description());
         assertNull(blank.description());
+    }
+
+    @Test
+    void shouldDefaultToEqualSplit() {
+        CreateExpenseRequest request = new CreateExpenseRequest(BigDecimal.TEN,
+                ExpenseCategory.FOOD, null, 1L, null, List.of(1L), null);
+
+        assertEquals(SplitType.EQUAL, request.splitType());
     }
 }
