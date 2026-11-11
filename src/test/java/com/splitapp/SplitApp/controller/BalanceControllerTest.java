@@ -4,22 +4,30 @@ import com.splitapp.SplitApp.dto.GroupBalancesResponse;
 import com.splitapp.SplitApp.dto.MemberBalanceResponse;
 import com.splitapp.SplitApp.dto.SettlementTransferResponse;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
+import com.splitapp.SplitApp.security.SecurityConfig;
 import com.splitapp.SplitApp.service.BalanceService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.util.List;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(BalanceController.class)
+@Import(SecurityConfig.class)
+@WithMockUser
 class BalanceControllerTest {
     @Autowired
     private MockMvc mockMvc;
@@ -51,5 +59,16 @@ class BalanceControllerTest {
         mockMvc.perform(get("/groups/99/balances"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
+    @Test
+    @WithAnonymousUser
+    void shouldReturn401WithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/groups/1/balances"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().exists("WWW-Authenticate"))
+                .andExpect(jsonPath("$.title").value("Unauthorized"));
+
+        verifyNoInteractions(balanceService);
     }
 }

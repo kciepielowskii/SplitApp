@@ -3,12 +3,15 @@ package com.splitapp.SplitApp.controller;
 import com.splitapp.SplitApp.dto.RegisterUserRequest;
 import com.splitapp.SplitApp.dto.UserResponse;
 import com.splitapp.SplitApp.exception.EmailAlreadyUsedException;
+import com.splitapp.SplitApp.security.SecurityConfig;
 import com.splitapp.SplitApp.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -20,6 +23,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
+@Import(SecurityConfig.class)
+@WithMockUser
 class UserControllerTest {
     private static final String VALID_BODY = """
             {"firstName":"Jan","lastName":"Kowalski","email":"jan@example.com","password":"secret123"}
