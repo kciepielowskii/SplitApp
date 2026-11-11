@@ -87,4 +87,60 @@ class ApplicationFlowIntegrationTest {
     private static String uniqueEmail() {
         return "e2e-" + UUID.randomUUID() + "@example.com";
     }
+
+    @Test
+    void shouldCreateExpenseInGroup() throws Exception {
+        long userId = registerUser(uniqueEmail());
+        long groupId = createGroup(userId);
+
+        mockMvc.perform(post("/groups/%d/expenses".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":10.00,"category":"FOOD","description":"Obiad","paidById":%d,"participantIds":[%d]}
+                                """.formatted(userId, userId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.groupId").value(groupId))
+                .andExpect(jsonPath("$.paidById").value(userId))
+                .andExpect(jsonPath("$.splits[0].userId").value(userId))
+                .andExpect(jsonPath("$.splits[0].amount").value(10.0));
+    }
+
+    @Test
+    void shouldReturn422WhenParticipantIsNotInGroup() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long outsiderId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+
+        mockMvc.perform(post("/groups/%d/expenses".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":10.00,"category":"FOOD","paidById":%d,"participantIds":[%d,%d]}
+                                """.formatted(ownerId, ownerId, outsiderId)))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.title").value("Business rule violation"));
+    }
+
+    @Test
+    void shouldReturn404WhenCreatingExpenseInUnknownGroup() throws Exception {
+        mockMvc.perform(post("/groups/999999/expenses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":10.00,"category":"FOOD","paidById":1,"participantIds":[1]}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
+    private long createGroup(long userId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"groupName":"Wyjazd","userId":%d}
+                                """.formatted(userId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        Number id = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
+        return id.longValue();
+    }
 }

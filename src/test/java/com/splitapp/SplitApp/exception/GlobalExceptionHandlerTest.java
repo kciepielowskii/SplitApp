@@ -92,4 +92,23 @@ class GlobalExceptionHandlerTest {
         assertEquals("Conflict", result.getTitle());
         assertEquals("Email is already in use", result.getDetail());
     }
+
+    @Test
+    void shouldReturnNotFoundForMissingGroup() {
+        ProblemDetail result = handler.handleGroupNotFound(new GroupNotFoundException("Group not found"));
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), result.getStatus());
+        assertEquals("Group not found", result.getTitle());
+        assertEquals("Group not found", result.getDetail());
+    }
+
+    @Test
+    void shouldReturn422ForBusinessRuleViolation() {
+        ProblemDetail result =
+                handler.handleBusinessRule(new BusinessRuleException("Participants must be unique"));
+
+        assertEquals(422, result.getStatus());
+        assertEquals("Business rule violation", result.getTitle());
+        assertEquals("Participants must be unique", result.getDetail());
+    }
 }

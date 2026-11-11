@@ -23,6 +23,8 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
+    private static final HttpStatus UNPROCESSABLE = HttpStatus.valueOf(422);
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException exception, HttpHeaders headers,
@@ -71,6 +73,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(EmailAlreadyUsedException.class)
     public ProblemDetail handleEmailAlreadyUsed(EmailAlreadyUsedException exception) {
         return problem(HttpStatus.CONFLICT, "Conflict", exception.getMessage());
+    }
+
+    @ExceptionHandler(GroupNotFoundException.class)
+    public ProblemDetail handleGroupNotFound(GroupNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, "Group not found", exception.getMessage());
+    }
+
+    @ExceptionHandler(BusinessRuleException.class)
+    public ProblemDetail handleBusinessRule(BusinessRuleException exception) {
+        return problem(UNPROCESSABLE, "Business rule violation", exception.getMessage());
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {
