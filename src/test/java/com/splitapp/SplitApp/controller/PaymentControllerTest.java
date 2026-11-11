@@ -4,11 +4,14 @@ import com.splitapp.SplitApp.dto.CreatePaymentRequest;
 import com.splitapp.SplitApp.dto.PaymentResponse;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
+import com.splitapp.SplitApp.security.SecurityConfig;
 import com.splitapp.SplitApp.service.PaymentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -26,6 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(PaymentController.class)
+@Import(SecurityConfig.class)
+@WithMockUser
 class PaymentControllerTest {
     private static final String VALID_BODY = """
             {"senderId":1,"receiverId":2,"amount":10.00}

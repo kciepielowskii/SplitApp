@@ -7,12 +7,15 @@ import com.splitapp.SplitApp.dto.SplitType;
 import com.splitapp.SplitApp.entity.ExpenseCategory;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
+import com.splitapp.SplitApp.security.SecurityConfig;
 import com.splitapp.SplitApp.service.ExpenseService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -33,6 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @WebMvcTest(ExpenseController.class)
+@Import(SecurityConfig.class)
+@WithMockUser
 class ExpenseControllerTest {
     private static final String VALID_BODY = """
             {"amount":10.00,"category":"FOOD","description":"Obiad","paidById":1,"participantIds":[1,2]}

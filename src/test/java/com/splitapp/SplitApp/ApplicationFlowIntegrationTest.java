@@ -7,11 +7,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.UUID;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -20,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
+@WithMockUser
 class ApplicationFlowIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
@@ -345,6 +349,39 @@ class ApplicationFlowIntegrationTest {
                                 """.formatted(ownerId, ownerId, friendId)))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.detail").value("Percentages must add up to 100"));
+    }
+
+    @Test
+    @WithAnonymousUser
+    void shouldReturn401WithoutCredentials() throws Exception {
+        mockMvc.perform(get("/groups/999999"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("Unauthorized"));
+    }
+
+    @Test
+    @WithAnonymousUser
+    void shouldAuthenticateRegisteredUserWithBasicAuth() throws Exception {
+        String email = uniqueEmail();
+        registerUser(email);
+
+        // 404 means the request got past authentication and reached the controller
+        mockMvc.perform(get("/groups/999999").with(httpBasic(email, "secret123")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
+    @Test
+    @WithAnonymousUser
+    void shouldReturn401ForWrongPasswordAndUnknownUser() throws Exception {
+        String email = uniqueEmail();
+        registerUser(email);
+
+        mockMvc.perform(get("/groups/999999").with(httpBasic(email, "wrong-password")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("Unauthorized"));
+        mockMvc.perform(get("/groups/999999").with(httpBasic("nobody@example.com", "secret123")))
+                .andExpect(status().isUnauthorized());
     }
 
     private void createSharedExpense(long groupId, long payerId, long otherId, String amount) throws Exception {

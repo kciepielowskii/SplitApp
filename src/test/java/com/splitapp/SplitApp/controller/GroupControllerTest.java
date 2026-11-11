@@ -6,11 +6,14 @@ import com.splitapp.SplitApp.entity.GroupRole;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
+import com.splitapp.SplitApp.security.SecurityConfig;
 import com.splitapp.SplitApp.service.GroupService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,6 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @WebMvcTest(GroupController.class)
+@Import(SecurityConfig.class)
+@WithMockUser
 class GroupControllerTest {
     @Autowired
     private MockMvc mockMvc;
