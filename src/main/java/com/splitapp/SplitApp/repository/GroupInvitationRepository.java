@@ -2,6 +2,7 @@ package com.splitapp.SplitApp.repository;
 
 import com.splitapp.SplitApp.entity.GroupInvitation;
 import com.splitapp.SplitApp.entity.InvitationStatus;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -18,6 +19,8 @@ public interface GroupInvitationRepository extends JpaRepository<GroupInvitation
     List<GroupInvitation> findAllByGroupIdAndStatusOrderByIdDesc(Long groupId,
                                                                  InvitationStatus status);
 
+    // the response shows the group name and the inviter, so load both in the same query
+    @EntityGraph(attributePaths = {"group", "invitedBy"})
     List<GroupInvitation> findAllByEmailAndStatusOrderByIdDesc(String email,
                                                                InvitationStatus status);
 }
