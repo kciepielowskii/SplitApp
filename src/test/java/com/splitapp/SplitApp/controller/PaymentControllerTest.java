@@ -9,6 +9,7 @@ import com.splitapp.SplitApp.exception.PaymentNotFoundException;
 import com.splitapp.SplitApp.security.SecurityConfig;
 import com.splitapp.SplitApp.security.WithMockAppUser;
 import com.splitapp.SplitApp.service.PaymentService;
+import com.splitapp.SplitApp.entity.PaymentStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -50,7 +51,8 @@ class PaymentControllerTest {
     @Test
     void shouldCreatePayment() throws Exception {
         PaymentResponse response = new PaymentResponse(7L, 1L, 1L, 2L, 1L,
-                new BigDecimal("10.00"), Instant.parse("2026-11-11T12:00:00Z"));
+                new BigDecimal("10.00"), PaymentStatus.PENDING,
+                Instant.parse("2026-11-11T12:00:00Z"));
         when(paymentService.createPayment(eq(1L), eq(1L), any(CreatePaymentRequest.class)))
                 .thenReturn(response);
 
@@ -118,7 +120,8 @@ class PaymentControllerTest {
     @Test
     void shouldReturnGroupPayments() throws Exception {
         PaymentResponse response = new PaymentResponse(7L, 1L, 1L, 2L, 1L,
-                new BigDecimal("10.00"), Instant.parse("2026-11-11T12:00:00Z"));
+                new BigDecimal("10.00"), PaymentStatus.PENDING,
+                Instant.parse("2026-11-11T12:00:00Z"));
         when(paymentService.getPayments(1L, 1L)).thenReturn(List.of(response));
 
         mockMvc.perform(get("/groups/1/payments"))
@@ -164,5 +167,48 @@ class PaymentControllerTest {
         mockMvc.perform(delete("/groups/1/payments/7"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.title").value("Forbidden"));
+    }
+
+    @Test
+    void shouldConfirmPayment() throws Exception {
+        PaymentResponse response = new PaymentResponse(7L, 1L, 2L, 1L, 2L,
+                new BigDecimal("10.00"), PaymentStatus.CONFIRMED,
+                Instant.parse("2026-11-11T12:00:00Z"));
+        when(paymentService.confirmPayment(1L, 1L, 7L)).thenReturn(response);
+
+        mockMvc.perform(post("/groups/1/payments/7/confirm"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(7))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+    }
+
+    @Test
+    void shouldReturn404WhenConfirmingUnknownPayment() throws Exception {
+        when(paymentService.confirmPayment(1L, 1L, 99L))
+                .thenThrow(new PaymentNotFoundException("Payment not found"));
+
+        mockMvc.perform(post("/groups/1/payments/99/confirm"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Payment not found"));
+    }
+
+    @Test
+    void shouldReturn403WhenConfirmingAsNonReceiver() throws Exception {
+        when(paymentService.confirmPayment(1L, 1L, 7L))
+                .thenThrow(new GroupAccessDeniedException("Only the receiver can confirm this payment"));
+
+        mockMvc.perform(post("/groups/1/payments/7/confirm"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"));
+    }
+
+    @Test
+    void shouldReturn422WhenConfirmingAnAlreadyConfirmedPayment() throws Exception {
+        when(paymentService.confirmPayment(1L, 1L, 7L))
+                .thenThrow(new BusinessRuleException("Payment is already confirmed"));
+
+        mockMvc.perform(post("/groups/1/payments/7/confirm"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value("Payment is already confirmed"));
     }
 }

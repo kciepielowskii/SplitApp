@@ -1,6 +1,7 @@
 package com.splitapp.SplitApp.repository;
 
 import com.splitapp.SplitApp.entity.Payment;
+import com.splitapp.SplitApp.entity.PaymentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -16,4 +17,6 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findAllByGroupIdOrderByPaidAtDescIdDesc(Long groupId);
 
     Optional<Payment> findByIdAndGroupId(Long id, Long groupId);
+
+    List<Payment> findAllByGroupIdAndStatus(Long groupId, PaymentStatus status);
 }

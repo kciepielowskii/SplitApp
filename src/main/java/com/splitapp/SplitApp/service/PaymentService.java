@@ -4,6 +4,7 @@ import com.splitapp.SplitApp.dto.CreatePaymentRequest;
 import com.splitapp.SplitApp.dto.PaymentResponse;
 import com.splitapp.SplitApp.entity.ExpenseGroup;
 import com.splitapp.SplitApp.entity.Payment;
+import com.splitapp.SplitApp.entity.PaymentStatus;
 import com.splitapp.SplitApp.entity.User;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
@@ -92,5 +93,23 @@ public class PaymentService {
         }
 
         paymentRepository.delete(payment);
+    }
+
+    @Transactional
+    public PaymentResponse confirmPayment(@NotNull Long groupId, @NotNull Long currentUserId,
+                                          @NotNull Long paymentId) {
+        groupAccess.requireMember(groupId, currentUserId);
+        Payment payment = paymentRepository.findByIdAndGroupId(paymentId, groupId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found"));
+
+        if (!payment.getReceiver().getId().equals(currentUserId)) {
+            throw new GroupAccessDeniedException("Only the receiver can confirm this payment");
+        }
+        if (payment.getStatus() == PaymentStatus.CONFIRMED) {
+            throw new BusinessRuleException("Payment is already confirmed");
+        }
+
+        payment.confirm();
+        return PaymentResponse.from(payment);
     }
 }

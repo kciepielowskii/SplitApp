@@ -14,6 +14,7 @@ import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.repository.GroupRepository;
 import com.splitapp.SplitApp.repository.PaymentRepository;
 import com.splitapp.SplitApp.repository.UserRepository;
+import com.splitapp.SplitApp.entity.PaymentStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -72,6 +73,7 @@ class PaymentServiceTest {
         assertEquals(1L, result.senderId());
         assertEquals(2L, result.receiverId());
         assertEquals(1L, result.createdById());
+        assertEquals(PaymentStatus.PENDING, result.status());
         assertEquals(new BigDecimal("10.00"), result.amount());
     }
 
@@ -91,6 +93,7 @@ class PaymentServiceTest {
         assertEquals(1L, result.senderId());
         assertEquals(2L, result.receiverId());
         assertEquals(2L, result.createdById());
+        assertEquals(PaymentStatus.CONFIRMED, result.status());
     }
 
     @Test
@@ -277,6 +280,69 @@ class PaymentServiceTest {
 
         assertThrows(GroupAccessDeniedException.class,
                 () -> paymentService.deletePayment(GROUP_ID, 9L, 7L));
+
+        verifyNoInteractions(paymentRepository);
+    }
+
+    @Test
+    void shouldConfirmPaymentWhenCallerIsReceiver() {
+        User owner = user(1L);
+        User sender = user(2L);
+        User receiver = user(3L);
+        Payment payment = paymentBy(sender, sender, receiver, groupWithOwner(owner, sender, receiver));
+        when(paymentRepository.findByIdAndGroupId(7L, GROUP_ID)).thenReturn(Optional.of(payment));
+
+        PaymentResponse result = paymentService.confirmPayment(GROUP_ID, 3L, 7L);
+
+        verify(groupAccess).requireMember(GROUP_ID, 3L);
+        assertEquals(PaymentStatus.CONFIRMED, result.status());
+        assertEquals(PaymentStatus.CONFIRMED, payment.getStatus());
+    }
+
+    @Test
+    void shouldRejectConfirmingWhenCallerIsNotTheReceiver() {
+        User owner = user(1L);
+        User sender = user(2L);
+        User receiver = user(3L);
+        Payment payment = paymentBy(sender, sender, receiver, groupWithOwner(owner, sender, receiver));
+        when(paymentRepository.findByIdAndGroupId(7L, GROUP_ID)).thenReturn(Optional.of(payment));
+
+        GroupAccessDeniedException ex = assertThrows(GroupAccessDeniedException.class,
+                () -> paymentService.confirmPayment(GROUP_ID, 2L, 7L));
+
+        assertEquals("Only the receiver can confirm this payment", ex.getMessage());
+        assertEquals(PaymentStatus.PENDING, payment.getStatus());
+    }
+
+    @Test
+    void shouldRejectConfirmingAnAlreadyConfirmedPayment() {
+        User owner = user(1L);
+        User sender = user(2L);
+        User receiver = user(3L);
+        Payment payment = paymentBy(receiver, sender, receiver, groupWithOwner(owner, sender, receiver));
+        when(paymentRepository.findByIdAndGroupId(7L, GROUP_ID)).thenReturn(Optional.of(payment));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> paymentService.confirmPayment(GROUP_ID, 3L, 7L));
+
+        assertEquals("Payment is already confirmed", ex.getMessage());
+    }
+
+    @Test
+    void shouldThrowWhenConfirmingUnknownPayment() {
+        when(paymentRepository.findByIdAndGroupId(99L, GROUP_ID)).thenReturn(Optional.empty());
+
+        assertThrows(PaymentNotFoundException.class,
+                () -> paymentService.confirmPayment(GROUP_ID, CURRENT_USER_ID, 99L));
+    }
+
+    @Test
+    void shouldNotConfirmPaymentWhenCallerIsNotMember() {
+        doThrow(new GroupAccessDeniedException("You are not a member of this group"))
+                .when(groupAccess).requireMember(GROUP_ID, 9L);
+
+        assertThrows(GroupAccessDeniedException.class,
+                () -> paymentService.confirmPayment(GROUP_ID, 9L, 7L));
 
         verifyNoInteractions(paymentRepository);
     }
