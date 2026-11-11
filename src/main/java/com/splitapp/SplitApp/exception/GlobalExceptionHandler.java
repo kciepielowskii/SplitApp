@@ -23,7 +23,7 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    private static final HttpStatus UNPROCESSABLE = HttpStatus.valueOf(422);
+    private static final String UNIQUE_VIOLATION = "23505";
 
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
@@ -32,6 +32,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         Map<String, String> errors = new LinkedHashMap<>();
         exception.getBindingResult().getFieldErrors().forEach(error ->
                 errors.putIfAbsent(error.getField(), error.getDefaultMessage()));
+        exception.getBindingResult().getGlobalErrors().forEach(error ->
+                errors.putIfAbsent("_global", error.getDefaultMessage()));
 
         return handleExceptionInternal(exception, validationProblem(errors), headers, status, request);
     }
@@ -50,24 +52,33 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return validationProblem(errors);
     }
 
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException exception) {
+        // Do not log the exception message: the database includes the conflicting values in it.
+        org.hibernate.exception.ConstraintViolationException cause =
+                exception.getCause() instanceof org.hibernate.exception.ConstraintViolationException c
+                        ? c : null;
+        String constraint = cause != null && cause.getConstraintName() != null
+                ? cause.getConstraintName()
+                : "unknown";
+        String sqlState = cause != null ? cause.getSQLState() : null;
+
+        if (UNIQUE_VIOLATION.equals(sqlState)) {
+            log.warn("Unique constraint violated: {}", constraint);
+            return problem(HttpStatus.CONFLICT, "Conflict",
+                    "The request conflicts with existing data");
+        }
+
+        log.error("Data integrity violation, constraint: {}, SQLState: {}", constraint, sqlState);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",
+                "An unexpected error occurred.");
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception exception) {
         log.error("Unexpected error", exception);
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",
                 "An unexpected error occurred.");
-    }
-
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException exception) {
-        // Do not log the exception message: the database includes the conflicting values in it.
-        String constraint =
-                exception.getCause() instanceof org.hibernate.exception.ConstraintViolationException cause
-                        && cause.getConstraintName() != null
-                        ? cause.getConstraintName()
-                        : "unknown";
-        log.warn("Data integrity violation, constraint: {}", constraint);
-
-        return problem(HttpStatus.CONFLICT, "Conflict", "The request conflicts with existing data");
     }
 
     @ExceptionHandler(EmailAlreadyUsedException.class)
@@ -87,7 +98,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(BusinessRuleException.class)
     public ProblemDetail handleBusinessRule(BusinessRuleException exception) {
-        return problem(UNPROCESSABLE, "Business rule violation", exception.getMessage());
+        return problem(HttpStatus.UNPROCESSABLE_CONTENT, "Business rule violation", exception.getMessage());
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {

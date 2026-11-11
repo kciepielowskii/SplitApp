@@ -15,7 +15,10 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         ProblemDetailAuthenticationEntryPoint entryPoint = new ProblemDetailAuthenticationEntryPoint();
         http
-                // stateless API: credentials come with every request, no cookies, so CSRF does not apply
+                // CSRF protection is off. Browsers cache Basic credentials and resend them
+                // automatically, so a cross-site request is stopped only because the API
+                // accepts application/json (an HTML form cannot send it). Do not add
+                // permissive CORS or endpoints that accept form data.
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
