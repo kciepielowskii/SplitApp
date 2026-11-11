@@ -264,6 +264,57 @@ class PaymentServiceTest {
     }
 
     @Test
+    void shouldRejectDeletingPaymentWhenSenderHasLeft() {
+        User owner = user(1L);
+        User sender = user(2L);
+        User receiver = user(3L);
+        ExpenseGroup group = groupWithOwner(owner, sender, receiver);
+        Payment payment = paymentBy(receiver, sender, receiver, group);
+        group.removeMember(2L);
+        when(paymentRepository.findByIdAndGroupId(7L, GROUP_ID)).thenReturn(Optional.of(payment));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class,
+                () -> paymentService.deletePayment(GROUP_ID, 3L, 7L));
+
+        assertEquals("Cannot delete a payment that involves a user who has left the group",
+                ex.getMessage());
+        verify(paymentRepository, never()).delete(any(Payment.class));
+    }
+
+    @Test
+    void shouldRejectDeletingPaymentWhenReceiverHasLeft() {
+        User owner = user(1L);
+        User sender = user(2L);
+        User receiver = user(3L);
+        ExpenseGroup group = groupWithOwner(owner, sender, receiver);
+        Payment payment = paymentBy(sender, sender, receiver, group);
+        group.removeMember(3L);
+        when(paymentRepository.findByIdAndGroupId(7L, GROUP_ID)).thenReturn(Optional.of(payment));
+
+        assertThrows(BusinessRuleException.class,
+                () -> paymentService.deletePayment(GROUP_ID, 1L, 7L));
+
+        verify(paymentRepository, never()).delete(any(Payment.class));
+    }
+
+    @Test
+    void shouldReportMissingPermissionBeforeFormerMemberProblemOnPayment() {
+        User owner = user(1L);
+        User sender = user(2L);
+        User receiver = user(3L);
+        User other = user(4L);
+        ExpenseGroup group = groupWithOwner(owner, sender, receiver, other);
+        Payment payment = paymentBy(sender, sender, receiver, group);
+        group.removeMember(2L);
+        when(paymentRepository.findByIdAndGroupId(7L, GROUP_ID)).thenReturn(Optional.of(payment));
+
+        assertThrows(GroupAccessDeniedException.class,
+                () -> paymentService.deletePayment(GROUP_ID, 4L, 7L));
+
+        verify(paymentRepository, never()).delete(any(Payment.class));
+    }
+
+    @Test
     void shouldThrowWhenDeletingUnknownPayment() {
         when(paymentRepository.findByIdAndGroupId(99L, GROUP_ID)).thenReturn(Optional.empty());
 
