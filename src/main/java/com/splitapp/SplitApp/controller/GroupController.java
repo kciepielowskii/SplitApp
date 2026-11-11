@@ -1,6 +1,5 @@
 package com.splitapp.SplitApp.controller;
 
-import com.splitapp.SplitApp.dto.AddMemberRequest;
 import com.splitapp.SplitApp.dto.CreateGroupRequest;
 import com.splitapp.SplitApp.dto.GroupResponse;
 import com.splitapp.SplitApp.security.AppUserDetails;
@@ -29,14 +28,6 @@ public class GroupController {
                                      @AuthenticationPrincipal AppUserDetails currentUser) {
         return groupService.createGroup(
                 request.groupName(), request.groupDescription(), currentUser.getId());
-    }
-
-    @PostMapping("/{groupId}/members")
-    @ResponseStatus(HttpStatus.CREATED)
-    public GroupResponse addMember(@PathVariable Long groupId,
-                                   @Valid @RequestBody AddMemberRequest request,
-                                   @AuthenticationPrincipal AppUserDetails currentUser) {
-        return groupService.addMember(groupId, currentUser.getId(), request.userId());
     }
 
     @GetMapping("/{groupId}")

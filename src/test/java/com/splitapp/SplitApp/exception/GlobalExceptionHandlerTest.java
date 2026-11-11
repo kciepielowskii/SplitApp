@@ -2,6 +2,7 @@ package com.splitapp.SplitApp.exception;
 
 import com.splitapp.SplitApp.dto.RegisterUserRequest;
 import com.splitapp.SplitApp.service.GroupService;
+import com.splitapp.SplitApp.exception.InvitationNotFoundException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
@@ -173,6 +174,15 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.NOT_FOUND.value(), result.getStatus());
         assertEquals("Payment not found", result.getTitle());
+    }
+
+    @Test
+    void shouldReturnNotFoundForMissingInvitation() {
+        ProblemDetail result = handler.handleInvitationNotFound(
+                new InvitationNotFoundException("Invitation not found"));
+
+        assertEquals(HttpStatus.NOT_FOUND.value(), result.getStatus());
+        assertEquals("Invitation not found", result.getTitle());
     }
 
     @Test

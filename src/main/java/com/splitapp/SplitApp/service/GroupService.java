@@ -4,12 +4,10 @@ import com.splitapp.SplitApp.dto.GroupResponse;
 import com.splitapp.SplitApp.entity.ExpenseGroup;
 import com.splitapp.SplitApp.entity.GroupRole;
 import com.splitapp.SplitApp.entity.User;
-import com.splitapp.SplitApp.exception.BusinessRuleException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.repository.GroupRepository;
 import com.splitapp.SplitApp.repository.UserRepository;
-import com.splitapp.SplitApp.exception.GroupAccessDeniedException;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -36,28 +34,6 @@ public class GroupService {
         ExpenseGroup group = new ExpenseGroup(groupName, groupDescription, user);
         group.addMember(user, GroupRole.OWNER);
         return GroupResponse.from(groupRepository.save(group));
-    }
-
-    @Transactional
-    public GroupResponse addMember(@NotNull Long groupId, @NotNull Long currentUserId,
-                                   @NotNull Long userId) {
-        groupAccess.requireMember(groupId, currentUserId);
-        ExpenseGroup group = groupRepository.findWithMembersById(groupId)
-                .orElseThrow(() -> new GroupNotFoundException("Group not found"));
-
-        if (!group.isOwner(currentUserId)) {
-            throw new GroupAccessDeniedException("Only the group owner can add members");
-        }
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("User not found"));
-
-        if (group.hasMember(user)) {
-            throw new BusinessRuleException("User is already a member of this group");
-        }
-
-        group.addMember(user, GroupRole.MEMBER);
-        return GroupResponse.from(group);
     }
 
     @Transactional(readOnly = true)
