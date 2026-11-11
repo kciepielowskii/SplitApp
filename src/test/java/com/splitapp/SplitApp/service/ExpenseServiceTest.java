@@ -74,7 +74,7 @@ class ExpenseServiceTest {
         ExpenseResponse result = expenseService.createExpense(GROUP_ID, CURRENT_USER_ID,
                 request("10.00", 1L, List.of(1L, 2L, 3L)));
 
-        verify(groupAccess).requireMember(GROUP_ID, CURRENT_USER_ID);
+        verify(groupAccess).requireMemberAndLock(GROUP_ID, CURRENT_USER_ID);
         assertEquals(GROUP_ID, result.groupId());
         assertEquals(new BigDecimal("10.00"), result.amount());
         assertEquals(1L, result.paidById());
@@ -322,7 +322,7 @@ class ExpenseServiceTest {
     @Test
     void shouldNotCreateExpenseWhenCallerIsNotMember() {
         doThrow(new GroupAccessDeniedException("You are not a member of this group"))
-                .when(groupAccess).requireMember(GROUP_ID, 9L);
+                .when(groupAccess).requireMemberAndLock(GROUP_ID, 9L);
 
         assertThrows(GroupAccessDeniedException.class, () -> expenseService.createExpense(
                 GROUP_ID, 9L, request("10.00", 1L, List.of(1L))));
@@ -349,7 +349,7 @@ class ExpenseServiceTest {
 
         expenseService.deleteExpense(GROUP_ID, 2L, 5L);
 
-        verify(groupAccess).requireMember(GROUP_ID, 2L);
+        verify(groupAccess).requireMemberAndLock(GROUP_ID, 2L);
         verify(expenseRepository).delete(expense);
     }
 
@@ -465,7 +465,7 @@ class ExpenseServiceTest {
     @Test
     void shouldNotDeleteExpenseWhenCallerIsNotMember() {
         doThrow(new GroupAccessDeniedException("You are not a member of this group"))
-                .when(groupAccess).requireMember(GROUP_ID, 9L);
+                .when(groupAccess).requireMemberAndLock(GROUP_ID, 9L);
 
         assertThrows(GroupAccessDeniedException.class,
                 () -> expenseService.deleteExpense(GROUP_ID, 9L, 5L));

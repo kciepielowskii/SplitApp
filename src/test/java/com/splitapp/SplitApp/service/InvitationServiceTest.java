@@ -67,7 +67,7 @@ class InvitationServiceTest {
 
         InvitationResponse result = invitationService.invite(GROUP_ID, 1L, "  Anna@Example.com ");
 
-        verify(groupAccess).requireMember(GROUP_ID, 1L);
+        verify(groupAccess).requireMemberAndLock(GROUP_ID, 1L);
         assertEquals(GROUP_ID, result.groupId());
         assertEquals("anna@example.com", result.email());
         assertEquals(1L, result.invitedById());
@@ -127,7 +127,7 @@ class InvitationServiceTest {
     @Test
     void shouldNotInviteWhenCallerIsNotMember() {
         doThrow(new GroupAccessDeniedException("You are not a member of this group"))
-                .when(groupAccess).requireMember(GROUP_ID, 9L);
+                .when(groupAccess).requireMemberAndLock(GROUP_ID, 9L);
 
         assertThrows(GroupAccessDeniedException.class,
                 () -> invitationService.invite(GROUP_ID, 9L, "anna@example.com"));
@@ -175,6 +175,7 @@ class InvitationServiceTest {
 
         invitationService.cancelInvitation(GROUP_ID, 1L, 5L);
 
+        verify(groupAccess).requireMemberAndLock(GROUP_ID, 1L);
         verify(invitationRepository).delete(invitation);
     }
 
@@ -249,10 +250,12 @@ class InvitationServiceTest {
         when(invitationRepository.findByIdAndEmailAndStatus(
                 5L, "jan2@example.com", InvitationStatus.PENDING))
                 .thenReturn(Optional.of(invitation));
+        when(groupRepository.findByIdForUpdate(GROUP_ID)).thenReturn(Optional.of(group));
         when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.of(group));
 
         GroupResponse result = invitationService.acceptInvitation(2L, 5L);
 
+        verify(groupRepository).findByIdForUpdate(GROUP_ID);
         assertEquals(2, result.members().size());
         assertEquals(2L, result.members().get(1).userId());
         assertEquals(GroupRole.MEMBER, result.members().get(1).role());
@@ -269,6 +272,7 @@ class InvitationServiceTest {
         when(invitationRepository.findByIdAndEmailAndStatus(
                 5L, "jan2@example.com", InvitationStatus.PENDING))
                 .thenReturn(Optional.of(invitation));
+        when(groupRepository.findByIdForUpdate(GROUP_ID)).thenReturn(Optional.of(group));
         when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.of(group));
 
         GroupResponse result = invitationService.acceptInvitation(2L, 5L);
@@ -300,7 +304,27 @@ class InvitationServiceTest {
     }
 
     @Test
-    void shouldDeclineInvitationWithoutJoiningGroup() {
+    void shouldTreatAnInvitationCancelledWhileWaitingForTheLockAsMissingOnAccept() {
+        User owner = user(1L);
+        User invitee = user(2L);
+        ExpenseGroup group = groupWithOwner(owner);
+        GroupInvitation invitation = new GroupInvitation(group, invitee.getEmail(), owner);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(invitee));
+        // found before the lock, gone once the lock is held
+        when(invitationRepository.findByIdAndEmailAndStatus(
+                5L, "jan2@example.com", InvitationStatus.PENDING))
+                .thenReturn(Optional.of(invitation), Optional.empty());
+        when(groupRepository.findByIdForUpdate(GROUP_ID)).thenReturn(Optional.of(group));
+
+        assertThrows(InvitationNotFoundException.class,
+                () -> invitationService.acceptInvitation(2L, 5L));
+
+        verify(groupRepository, never()).findWithMembersById(any());
+        assertEquals(InvitationStatus.PENDING, invitation.getStatus());
+    }
+
+    @Test
+    void shouldThrowWhenTheGroupOfTheInvitationNoLongerExists() {
         User owner = user(1L);
         User invitee = user(2L);
         GroupInvitation invitation =
@@ -309,11 +333,49 @@ class InvitationServiceTest {
         when(invitationRepository.findByIdAndEmailAndStatus(
                 5L, "jan2@example.com", InvitationStatus.PENDING))
                 .thenReturn(Optional.of(invitation));
+        when(groupRepository.findByIdForUpdate(GROUP_ID)).thenReturn(Optional.empty());
+
+        assertThrows(GroupNotFoundException.class,
+                () -> invitationService.acceptInvitation(2L, 5L));
+
+        assertEquals(InvitationStatus.PENDING, invitation.getStatus());
+    }
+
+    @Test
+    void shouldDeclineInvitationWithoutJoiningGroup() {
+        User owner = user(1L);
+        User invitee = user(2L);
+        ExpenseGroup group = groupWithOwner(owner);
+        GroupInvitation invitation = new GroupInvitation(group, invitee.getEmail(), owner);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(invitee));
+        when(invitationRepository.findByIdAndEmailAndStatus(
+                5L, "jan2@example.com", InvitationStatus.PENDING))
+                .thenReturn(Optional.of(invitation));
+        when(groupRepository.findByIdForUpdate(GROUP_ID)).thenReturn(Optional.of(group));
 
         invitationService.declineInvitation(2L, 5L);
 
         assertEquals(InvitationStatus.DECLINED, invitation.getStatus());
-        verifyNoInteractions(groupRepository);
+        verify(groupRepository).findByIdForUpdate(GROUP_ID);
+        verify(groupRepository, never()).findWithMembersById(any());
+    }
+
+    @Test
+    void shouldTreatAnInvitationCancelledWhileWaitingForTheLockAsMissingOnDecline() {
+        User owner = user(1L);
+        User invitee = user(2L);
+        ExpenseGroup group = groupWithOwner(owner);
+        GroupInvitation invitation = new GroupInvitation(group, invitee.getEmail(), owner);
+        when(userRepository.findById(2L)).thenReturn(Optional.of(invitee));
+        when(invitationRepository.findByIdAndEmailAndStatus(
+                5L, "jan2@example.com", InvitationStatus.PENDING))
+                .thenReturn(Optional.of(invitation), Optional.empty());
+        when(groupRepository.findByIdForUpdate(GROUP_ID)).thenReturn(Optional.of(group));
+
+        assertThrows(InvitationNotFoundException.class,
+                () -> invitationService.declineInvitation(2L, 5L));
+
+        assertEquals(InvitationStatus.PENDING, invitation.getStatus());
     }
 
     @Test

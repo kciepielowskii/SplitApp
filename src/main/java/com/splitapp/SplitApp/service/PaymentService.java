@@ -37,7 +37,7 @@ public class PaymentService {
     @Transactional
     public PaymentResponse createPayment(@NotNull Long groupId, @NotNull Long currentUserId,
                                          @NotNull @Valid CreatePaymentRequest request) {
-        groupAccess.requireMember(groupId, currentUserId);
+        groupAccess.requireMemberAndLock(groupId, currentUserId);
 
         if (!currentUserId.equals(request.senderId())
                 && !currentUserId.equals(request.receiverId())) {
@@ -82,7 +82,7 @@ public class PaymentService {
     @Transactional
     public void deletePayment(@NotNull Long groupId, @NotNull Long currentUserId,
                               @NotNull Long paymentId) {
-        groupAccess.requireMember(groupId, currentUserId);
+        groupAccess.requireMemberAndLock(groupId, currentUserId);
         Payment payment = paymentRepository.findByIdAndGroupId(paymentId, groupId)
                 .orElseThrow(() -> new PaymentNotFoundException("Payment not found"));
 
@@ -107,7 +107,7 @@ public class PaymentService {
     @Transactional
     public PaymentResponse confirmPayment(@NotNull Long groupId, @NotNull Long currentUserId,
                                           @NotNull Long paymentId) {
-        groupAccess.requireMember(groupId, currentUserId);
+        groupAccess.requireMemberAndLock(groupId, currentUserId);
         Payment payment = paymentRepository.findByIdAndGroupId(paymentId, groupId)
                 .orElseThrow(() -> new PaymentNotFoundException("Payment not found"));
 

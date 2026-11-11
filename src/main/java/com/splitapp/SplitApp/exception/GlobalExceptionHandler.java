@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.dao.ConcurrencyFailureException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -72,6 +73,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         log.error("Data integrity violation, constraint: {}, SQLState: {}", constraint, sqlState);
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",
                 "An unexpected error occurred.");
+    }
+
+    // Optimistic and pessimistic locking failures and deadlocks all extend this exception.
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    public ProblemDetail handleConcurrencyFailure(ConcurrencyFailureException exception) {
+        log.warn("Concurrent modification: {}", exception.getClass().getSimpleName());
+        return problem(HttpStatus.CONFLICT, "Conflict",
+                "The data was changed by another request; please try again");
     }
 
     @ExceptionHandler(Exception.class)

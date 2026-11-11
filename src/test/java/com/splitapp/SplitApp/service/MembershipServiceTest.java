@@ -61,7 +61,7 @@ class MembershipServiceTest {
 
         GroupResponse result = membershipService.transferOwnership(GROUP_ID, 1L, 2L);
 
-        verify(groupAccess).requireMember(GROUP_ID, 1L);
+        verify(groupAccess).requireMemberAndLock(GROUP_ID, 1L);
         assertEquals(GroupRole.MEMBER, result.members().get(0).role());
         assertEquals(GroupRole.OWNER, result.members().get(1).role());
     }
@@ -112,7 +112,7 @@ class MembershipServiceTest {
     @Test
     void shouldNotTransferWhenCallerIsNotMember() {
         doThrow(new GroupAccessDeniedException("You are not a member of this group"))
-                .when(groupAccess).requireMember(GROUP_ID, 9L);
+                .when(groupAccess).requireMemberAndLock(GROUP_ID, 9L);
 
         assertThrows(GroupAccessDeniedException.class,
                 () -> membershipService.transferOwnership(GROUP_ID, 9L, 2L));
@@ -133,7 +133,7 @@ class MembershipServiceTest {
 
         membershipService.leaveGroup(GROUP_ID, 2L);
 
-        verify(groupAccess).requireMember(GROUP_ID, 2L);
+        verify(groupAccess).requireMemberAndLock(GROUP_ID, 2L);
         assertFalse(group.isMember(2L));
         assertTrue(group.isMember(1L));
     }
@@ -226,7 +226,7 @@ class MembershipServiceTest {
     @Test
     void shouldNotLeaveWhenCallerIsNotMember() {
         doThrow(new GroupAccessDeniedException("You are not a member of this group"))
-                .when(groupAccess).requireMember(GROUP_ID, 9L);
+                .when(groupAccess).requireMemberAndLock(GROUP_ID, 9L);
 
         assertThrows(GroupAccessDeniedException.class,
                 () -> membershipService.leaveGroup(GROUP_ID, 9L));

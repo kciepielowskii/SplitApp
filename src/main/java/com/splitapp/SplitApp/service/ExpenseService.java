@@ -43,7 +43,7 @@ public class ExpenseService {
     @Transactional
     public ExpenseResponse createExpense(@NotNull Long groupId, @NotNull Long currentUserId,
                                          @NotNull @Valid CreateExpenseRequest request) {
-        groupAccess.requireMember(groupId, currentUserId);
+        groupAccess.requireMemberAndLock(groupId, currentUserId);
         ExpenseGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
 
@@ -133,7 +133,7 @@ public class ExpenseService {
     @Transactional
     public void deleteExpense(@NotNull Long groupId, @NotNull Long currentUserId,
                               @NotNull Long expenseId) {
-        groupAccess.requireMember(groupId, currentUserId);
+        groupAccess.requireMemberAndLock(groupId, currentUserId);
         Expense expense = expenseRepository.findByIdAndGroupId(expenseId, groupId)
                 .orElseThrow(() -> new ExpenseNotFoundException("Expense not found"));
 

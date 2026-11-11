@@ -12,7 +12,15 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+
 import java.util.List;
+import java.util.ArrayList;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
@@ -21,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -910,6 +919,68 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$[0].status").value("PENDING"));
     }
 
+    @Test
+    void shouldKeepASingleOwnerWhenOwnershipIsTransferredTwiceAtOnce() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser first = registerUser(uniqueEmail());
+        TestUser second = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, first);
+        addMember(groupId, owner, second);
+        String url = "/groups/%d/owner".formatted(groupId);
+
+        List<Integer> statuses = runAtTheSameTime(List.of(
+                () -> statusOfPost(owner, url, """
+                        {"userId":%d}
+                        """.formatted(first.id())),
+                () -> statusOfPost(owner, url, """
+                        {"userId":%d}
+                        """.formatted(second.id()))));
+
+        // the second transfer finds out that the caller is no longer the owner
+        assertEquals(1, statuses.stream().filter(status -> status == 200).count());
+        assertEquals(1, statuses.stream().filter(status -> status == 403).count());
+        assertEquals(1, ownerCount(owner, groupId));
+    }
+
+    @Test
+    void shouldNotLetAMemberLeaveAndBeChargedAtTheSameTime() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+
+        List<Integer> statuses = runAtTheSameTime(List.of(
+                () -> statusOfPost(friend, "/groups/%d/leave".formatted(groupId), ""),
+                () -> statusOfPost(owner, "/groups/%d/expenses".formatted(groupId), """
+                        {"amount":10.00,"category":"FOOD","paidById":%d,"participantIds":[%d,%d]}
+                        """.formatted(owner.id(), owner.id(), friend.id()))));
+
+        // either the expense comes first and the friend must settle up, or the friend
+        // leaves first and cannot be a participant; never both
+        assertEquals(1, statuses.stream()
+                .filter(status -> status == 204 || status == 201).count());
+    }
+
+    @Test
+    void shouldNeverLeaveAGroupWithoutAnOwner() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+
+        List<Integer> statuses = runAtTheSameTime(List.of(
+                () -> statusOfPost(owner, "/groups/%d/owner".formatted(groupId), """
+                        {"userId":%d}
+                        """.formatted(friend.id())),
+                () -> statusOfPost(friend, "/groups/%d/leave".formatted(groupId), "")));
+
+        // the new owner cannot leave, and a member who left cannot become the owner
+        assertEquals(1, statuses.stream()
+                .filter(status -> status == 200 || status == 204).count());
+        assertEquals(1, ownerCount(owner, groupId));
+    }
+
     private record TestUser(long id, String email) {
     }
 
@@ -930,6 +1001,45 @@ class ApplicationFlowIntegrationTest {
 
     private ResultActions remove(TestUser user, String url) throws Exception {
         return mockMvc.perform(delete(url).with(as(user)));
+    }
+
+    private int statusOfPost(TestUser user, String url, String body) throws Exception {
+        return send(user, url, body).andReturn().getResponse().getStatus();
+    }
+
+    private int ownerCount(TestUser viewer, long groupId) throws Exception {
+        String json = fetch(viewer, "/groups/%d".formatted(groupId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Object> owners = JsonPath.read(json, "$.members[?(@.role=='OWNER')]");
+        return owners.size();
+    }
+
+    // starts all actions together, so that their transactions overlap
+    private List<Integer> runAtTheSameTime(List<Callable<Integer>> actions) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(actions.size());
+        try {
+            CountDownLatch ready = new CountDownLatch(actions.size());
+            CountDownLatch start = new CountDownLatch(1);
+            List<Future<Integer>> futures = new ArrayList<>();
+            for (Callable<Integer> action : actions) {
+                futures.add(pool.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return action.call();
+                }));
+            }
+            ready.await();
+            start.countDown();
+
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> future : futures) {
+                statuses.add(future.get(30, TimeUnit.SECONDS));
+            }
+            return statuses;
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     private static long idOf(MvcResult result) throws Exception {
