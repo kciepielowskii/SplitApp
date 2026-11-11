@@ -93,6 +93,57 @@ class DatabaseConstraintsTest {
     }
 
     @Test
+    void shouldRejectASecondOwnerInOneGroup() {
+        User owner = saveUser("owner@example.com");
+        User other = saveUser("other@example.com");
+        ExpenseGroup group = saveGroup(owner);
+
+        assertViolates("uq_group_members_single_owner",
+                () -> groupMemberRepository.saveAndFlush(
+                        new GroupMember(group, other, GroupRole.OWNER)));
+    }
+
+    @Test
+    void shouldAllowAnOwnerInEveryGroupAndManyRegularMembers() {
+        User firstOwner = saveUser("owner1@example.com");
+        User secondOwner = saveUser("owner2@example.com");
+        User third = saveUser("third@example.com");
+        User fourth = saveUser("fourth@example.com");
+        ExpenseGroup first = saveGroup(firstOwner);
+        ExpenseGroup second = saveGroup(secondOwner);
+        first.addMember(third, GroupRole.MEMBER);
+        first.addMember(fourth, GroupRole.MEMBER);
+        groupRepository.saveAndFlush(first);
+
+        Integer owners = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM group_members WHERE role = 'OWNER' AND group_id IN (?, ?)",
+                Integer.class, first.getId(), second.getId());
+        Integer firstGroupRows = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM group_members WHERE group_id = ?",
+                Integer.class, first.getId());
+        assertEquals(2, owners);
+        assertEquals(3, firstGroupRows);
+    }
+
+    @Test
+    void shouldTransferOwnershipWithoutEverHavingTwoOwners() {
+        User owner = saveUser("owner@example.com");
+        User successor = saveUser("successor@example.com");
+        ExpenseGroup group = saveGroup(owner);
+        group.addMember(successor, GroupRole.MEMBER);
+        groupRepository.saveAndFlush(group);
+        entityManager.clear();
+
+        ExpenseGroup loaded = groupRepository.findWithMembersById(group.getId()).orElseThrow();
+        loaded.transferOwnership(owner.getId(), successor.getId(), groupRepository::flush);
+        groupRepository.flush();
+        entityManager.clear();
+
+        assertEquals("MEMBER", roleOf(group, owner));
+        assertEquals("OWNER", roleOf(group, successor));
+    }
+
+    @Test
     void shouldRejectTwoSplitsForSameUserInOneExpense() {
         User user = saveUser("payer@example.com");
         ExpenseGroup group = saveGroup(user);
@@ -271,6 +322,12 @@ class DatabaseConstraintsTest {
         ExpenseGroup group = new ExpenseGroup("Wyjazd", owner);
         group.addMember(owner, GroupRole.OWNER);
         return groupRepository.saveAndFlush(group);
+    }
+
+    private String roleOf(ExpenseGroup group, User user) {
+        return jdbcTemplate.queryForObject(
+                "SELECT role FROM group_members WHERE group_id = ? AND user_id = ?",
+                String.class, group.getId(), user.getId());
     }
 
     private static void assertViolates(String constraint, Executable action) {

@@ -39,7 +39,7 @@ public class MembershipService {
             throw new BusinessRuleException("The new owner must be a member of this group");
         }
 
-        group.transferOwnership(currentUserId, newOwnerId);
+        group.transferOwnership(currentUserId, newOwnerId, groupRepository::flush);
         return GroupResponse.from(group);
     }
 
