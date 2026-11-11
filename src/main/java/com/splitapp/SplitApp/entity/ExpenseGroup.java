@@ -21,6 +21,7 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "expense_group")
@@ -59,8 +60,8 @@ public class ExpenseGroup {
     }
 
     public ExpenseGroup(String groupName, User createdBy) {
-        this.groupName = groupName;
-        this.createdBy = createdBy;
+        this.groupName = Objects.requireNonNull(groupName, "Group name is required");
+        this.createdBy = Objects.requireNonNull(createdBy, "Creator is required");
     }
 
     public ExpenseGroup(String groupName, String groupDescription, User createdBy) {

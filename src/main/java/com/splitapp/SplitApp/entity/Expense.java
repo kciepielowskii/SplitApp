@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "expenses")
@@ -71,11 +72,11 @@ public class Expense {
 
     public Expense(BigDecimal amount, ExpenseCategory category, String description,
                    ExpenseGroup group, User paidBy) {
-        this.amount = amount;
-        this.category = category;
+        this.amount = Objects.requireNonNull(amount, "Amount is required");
+        this.category = Objects.requireNonNull(category, "Category is required");
         this.description = description;
-        this.group = group;
-        this.paidBy = paidBy;
+        this.group = Objects.requireNonNull(group, "Group is required");
+        this.paidBy = Objects.requireNonNull(paidBy, "Payer is required");
     }
 
     public void addSplit(ExpenseSplit split) {
