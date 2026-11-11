@@ -17,7 +17,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Objects;
@@ -65,9 +64,7 @@ public class Payment {
     }
 
     @PrePersist
-    public void onCreate() {
-        if (paidAt == null) {
-            paidAt = Instant.now();
-        }
+    protected void onCreate() {
+        this.paidAt = Instant.now();
     }
 }

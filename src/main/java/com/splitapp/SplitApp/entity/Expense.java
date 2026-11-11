@@ -65,7 +65,7 @@ public class Expense {
     private Instant createdAt;
 
     @PrePersist
-    public void onCreate() {
+    protected void onCreate() {
         createdAt = Instant.now();
     }
 

@@ -53,7 +53,7 @@ public class GroupMember {
     private Instant joinedAt;
 
     @PrePersist
-    public void onCreate() {
+    protected void onCreate() {
         joinedAt = Instant.now();
     }
 
