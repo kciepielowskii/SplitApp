@@ -13,7 +13,6 @@ import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 import java.util.Locale;
@@ -32,14 +31,12 @@ public class User {
     @Size(max = 50)
     @NotBlank(message = "First name is required")
     @Getter
-    @Setter
     private String firstName;
 
     @Column(nullable = false, length = 50)
     @Size(max = 50)
     @NotBlank(message = "Last name is required")
     @Getter
-    @Setter
     private String lastName;
 
     @Column(nullable = false, unique = true)
@@ -67,10 +64,6 @@ public class User {
         this.lastName = Objects.requireNonNull(lastName, "Last name is required");
         this.email = normalizeEmail(email);
         this.password = Objects.requireNonNull(passwordHash, "Password hash is required");
-    }
-
-    public void setEmail(String email) {
-        this.email = normalizeEmail(email);
     }
 
     public static String normalizeEmail(String email) {

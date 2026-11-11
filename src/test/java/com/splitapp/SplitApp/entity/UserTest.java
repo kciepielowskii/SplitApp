@@ -15,15 +15,6 @@ class UserTest {
     }
 
     @Test
-    void shouldNormalizeEmailInSetter() {
-        User user = new User("Jan", "Kowalski", "jan@example.com", "hash");
-
-        user.setEmail(" NEW@Example.com ");
-
-        assertEquals("new@example.com", user.getEmail());
-    }
-
-    @Test
     void shouldRejectNullEmail() {
         assertThrows(NullPointerException.class,
                 () -> new User("Jan", "Kowalski", null, "hash"));
