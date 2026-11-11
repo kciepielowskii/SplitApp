@@ -176,7 +176,7 @@ class PaymentControllerTest {
                 Instant.parse("2026-11-11T12:00:00Z"));
         when(paymentService.confirmPayment(1L, 1L, 7L)).thenReturn(response);
 
-        mockMvc.perform(post("/groups/1/payments/7/confirm"))
+        mockMvc.perform(post("/groups/1/payments/7/confirm").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(7))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
@@ -187,7 +187,7 @@ class PaymentControllerTest {
         when(paymentService.confirmPayment(1L, 1L, 99L))
                 .thenThrow(new PaymentNotFoundException("Payment not found"));
 
-        mockMvc.perform(post("/groups/1/payments/99/confirm"))
+        mockMvc.perform(post("/groups/1/payments/99/confirm").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Payment not found"));
     }
@@ -197,7 +197,7 @@ class PaymentControllerTest {
         when(paymentService.confirmPayment(1L, 1L, 7L))
                 .thenThrow(new GroupAccessDeniedException("Only the receiver can confirm this payment"));
 
-        mockMvc.perform(post("/groups/1/payments/7/confirm"))
+        mockMvc.perform(post("/groups/1/payments/7/confirm").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.title").value("Forbidden"));
     }
@@ -207,7 +207,7 @@ class PaymentControllerTest {
         when(paymentService.confirmPayment(1L, 1L, 7L))
                 .thenThrow(new BusinessRuleException("Payment is already confirmed"));
 
-        mockMvc.perform(post("/groups/1/payments/7/confirm"))
+        mockMvc.perform(post("/groups/1/payments/7/confirm").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.detail").value("Payment is already confirmed"));
     }

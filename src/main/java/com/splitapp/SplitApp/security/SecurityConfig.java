@@ -7,6 +7,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 @Configuration
 public class SecurityConfig {
@@ -16,16 +17,18 @@ public class SecurityConfig {
         ProblemDetailAuthenticationEntryPoint entryPoint = new ProblemDetailAuthenticationEntryPoint();
         http
                 // CSRF protection is off. Browsers cache Basic credentials and resend them
-                // automatically, so a cross-site request is stopped only because the API
-                // accepts application/json (an HTML form cannot send it). Do not add
-                // permissive CORS or endpoints that accept form data.
+                // automatically, so a cross-site form POST would be authenticated. That is
+                // stopped by RequireJsonContentTypeFilter: every POST must be application/json,
+                // which an HTML form cannot send. Do not add permissive CORS or endpoints
+                // that accept form data.
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()
                         .anyRequest().authenticated())
                 .httpBasic(basic -> basic.authenticationEntryPoint(entryPoint))
-                .exceptionHandling(handling -> handling.authenticationEntryPoint(entryPoint));
+                .exceptionHandling(handling -> handling.authenticationEntryPoint(entryPoint))
+                .addFilterAfter(new RequireJsonContentTypeFilter(), AuthorizationFilter.class);
         return http.build();
     }
 }
