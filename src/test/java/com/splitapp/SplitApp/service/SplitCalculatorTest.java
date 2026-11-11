@@ -149,4 +149,45 @@ class SplitCalculatorTest {
         assertThrows(IllegalArgumentException.class, () -> SplitCalculator.validateAmounts(
                 new BigDecimal("10.00"), List.of(new BigDecimal("10.00"), BigDecimal.ZERO)));
     }
+
+    @Test
+    void shouldAcceptLargestAmountFittingTheDatabaseColumn() {
+        List<BigDecimal> parts = SplitCalculator.splitEqually(new BigDecimal("99999999.99"), 1);
+
+        assertEquals(List.of(new BigDecimal("99999999.99")), parts);
+    }
+
+    @Test
+    void shouldRejectAmountAboveDatabaseLimit() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> SplitCalculator.splitEqually(new BigDecimal("100000000.00"), 2));
+
+        assertEquals("Value is too large (maximum is 99999999.99)", ex.getMessage());
+    }
+
+    @Test
+    void shouldRejectExplicitAmountsThatWouldOverflowWhenSummed() {
+        // 4 x 2^62 cents wraps around to 0, so with 10.00 the sum would equal the total
+        BigDecimal huge = new BigDecimal("46116860184273879.04");
+
+        assertThrows(IllegalArgumentException.class, () -> SplitCalculator.validateAmounts(
+                new BigDecimal("10.00"),
+                List.of(huge, huge, huge, huge, new BigDecimal("10.00"))));
+    }
+
+    @Test
+    void shouldRejectPercentageSplitOfAmountThatWouldOverflowMultiplication() {
+        assertThrows(IllegalArgumentException.class, () -> SplitCalculator.splitByPercentages(
+                new BigDecimal("92233720368547758.07"),
+                List.of(new BigDecimal("50"), new BigDecimal("50"))));
+    }
+
+    @Test
+    void shouldRejectExplicitAmountsWithMoreThanTwoDecimalPlaces() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> SplitCalculator.validateAmounts(new BigDecimal("10.00"),
+                        List.of(new BigDecimal("5.005"), new BigDecimal("4.995"))));
+
+        assertEquals("Amounts must have at most 2 decimal places", ex.getMessage());
+    }
 }
