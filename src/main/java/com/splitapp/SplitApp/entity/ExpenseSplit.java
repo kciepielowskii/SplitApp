@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 
 @Entity
 @Table(
@@ -52,7 +53,7 @@ public class ExpenseSplit {
     private User user;
 
     public ExpenseSplit(User user, BigDecimal amount) {
-        this.user = user;
-        this.amount = amount;
+        this.user = Objects.requireNonNull(user, "User is required");
+        this.amount = Objects.requireNonNull(amount, "Amount is required");
     }
 }

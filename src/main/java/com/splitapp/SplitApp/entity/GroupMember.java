@@ -18,6 +18,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.Objects;
 
 @Entity
 @Table(
@@ -58,8 +59,8 @@ public class GroupMember {
     }
 
     public GroupMember(ExpenseGroup group, User user, GroupRole role) {
-        this.group = group;
-        this.user = user;
-        this.role = role;
+        this.group = Objects.requireNonNull(group, "Group is required");
+        this.user = Objects.requireNonNull(user, "User is required");
+        this.role = Objects.requireNonNull(role, "Role is required");
     }
 }
