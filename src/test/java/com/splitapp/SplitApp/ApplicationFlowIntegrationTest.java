@@ -405,6 +405,56 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.members[0].userId").value(user.id()));
     }
 
+    @Test
+    void shouldReturn403WhenRegularMemberAddsMemberButOwnerCan() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        TestUser newcomer = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+
+        send(friend, "/groups/%d/members".formatted(groupId), """
+                {"userId":%d}
+                """.formatted(newcomer.id()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"))
+                .andExpect(jsonPath("$.detail").value("Only the group owner can add members"));
+
+        fetch(newcomer, "/groups/%d".formatted(groupId)).andExpect(status().isForbidden());
+
+        addMember(groupId, owner, newcomer);
+
+        fetch(newcomer, "/groups/%d".formatted(groupId)).andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldReturn403WhenPaymentIsRecordedByNeitherSenderNorReceiver() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        TestUser third = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        addMember(groupId, owner, third);
+
+        send(friend, "/groups/%d/payments".formatted(groupId), """
+                {"senderId":%d,"receiverId":%d,"amount":5.00}
+                """.formatted(third.id(), owner.id()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"))
+                .andExpect(jsonPath("$.detail")
+                        .value("You can only record payments you are part of"));
+
+        createPayment(groupId, third, owner, "5.00");
+        send(owner, "/groups/%d/payments".formatted(groupId), """
+                {"senderId":%d,"receiverId":%d,"amount":6.00}
+                """.formatted(third.id(), owner.id()))
+                .andExpect(status().isCreated());
+
+        fetch(owner, "/groups/%d/payments".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
     private record TestUser(long id, String email) {
     }
 
