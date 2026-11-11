@@ -50,4 +50,11 @@ public class GroupService {
         group.addMember(user, GroupRole.MEMBER);
         return GroupResponse.from(group);
     }
+
+    @Transactional(readOnly = true)
+    public GroupResponse getGroup(@NotNull Long groupId) {
+        return groupRepository.findWithMembersById(groupId)
+                .map(GroupResponse::from)
+                .orElseThrow(() -> new GroupNotFoundException("Group not found"));
+    }
 }

@@ -21,6 +21,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @WebMvcTest(GroupController.class)
 class GroupControllerTest {
@@ -202,5 +203,35 @@ class GroupControllerTest {
                                 """))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.title").value("Business rule violation"));
+    }
+
+    @Test
+    void shouldReturnGroup() throws Exception {
+        GroupResponse response = new GroupResponse(1L, "Wyjazd", null, 1L,
+                List.of(new GroupMemberResponse(1L, "Jan", "Kowalski", GroupRole.OWNER)));
+        when(groupService.getGroup(1L)).thenReturn(response);
+
+        mockMvc.perform(get("/groups/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.groupName").value("Wyjazd"))
+                .andExpect(jsonPath("$.members[0].role").value("OWNER"));
+    }
+
+    @Test
+    void shouldReturn404WhenGettingUnknownGroup() throws Exception {
+        when(groupService.getGroup(99L)).thenThrow(new GroupNotFoundException("Group not found"));
+
+        mockMvc.perform(get("/groups/99"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
+    @Test
+    void shouldRejectNonNumericGroupIdWhenGettingGroup() throws Exception {
+        mockMvc.perform(get("/groups/abc"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(groupService);
     }
 }

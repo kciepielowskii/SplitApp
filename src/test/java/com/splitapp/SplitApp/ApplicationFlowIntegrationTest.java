@@ -15,6 +15,7 @@ import java.util.UUID;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -244,5 +245,27 @@ class ApplicationFlowIntegrationTest {
     // the database is shared between tests in this class and is not rolled back
     private static String uniqueEmail() {
         return "e2e-" + UUID.randomUUID() + "@example.com";
+    }
+
+    @Test
+    void shouldReturnGroupWithAllMembers() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long friendId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+        addMember(groupId, friendId);
+
+        mockMvc.perform(get("/groups/%d".formatted(groupId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(groupId))
+                .andExpect(jsonPath("$.members.length()").value(2))
+                .andExpect(jsonPath("$.members[0].userId").value(ownerId))
+                .andExpect(jsonPath("$.members[1].userId").value(friendId));
+    }
+
+    @Test
+    void shouldReturn404WhenGettingUnknownGroup() throws Exception {
+        mockMvc.perform(get("/groups/999999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
     }
 }
