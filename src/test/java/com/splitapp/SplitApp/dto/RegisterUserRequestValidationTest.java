@@ -45,4 +45,16 @@ class RegisterUserRequestValidationTest {
     void shouldAcceptShortPasswordWithPolishCharacters() {
         assertTrue(validate("zażółć123").isEmpty());
     }
+
+    @Test
+    void shouldTrimNamesAndEmailButNotPassword() {
+        RegisterUserRequest request =
+                new RegisterUserRequest("  Jan ", " Kowalski  ", "  jan@example.com ", " secret123 ");
+
+        assertEquals("Jan", request.firstName());
+        assertEquals("Kowalski", request.lastName());
+        assertEquals("jan@example.com", request.email());
+        assertEquals(" secret123 ", request.password());
+        assertTrue(validator.validate(request).isEmpty());
+    }
 }

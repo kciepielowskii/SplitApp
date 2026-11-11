@@ -40,7 +40,7 @@ class UserServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         UserResponse result = userService.register(
-                new RegisterUserRequest("Jan", "Kowalski", " Jan@Example.com ", "secret123"));
+                new RegisterUserRequest("Jan", "Kowalski", "Jan@Example.com", "secret123"));
 
         assertEquals("jan@example.com", result.email());
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
