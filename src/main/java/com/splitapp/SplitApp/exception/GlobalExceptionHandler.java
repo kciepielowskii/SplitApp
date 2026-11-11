@@ -80,6 +80,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.NOT_FOUND, "Group not found", exception.getMessage());
     }
 
+    @ExceptionHandler(GroupAccessDeniedException.class)
+    public ProblemDetail handleGroupAccessDenied(GroupAccessDeniedException exception) {
+        return problem(HttpStatus.FORBIDDEN, "Forbidden", exception.getMessage());
+    }
+
     @ExceptionHandler(BusinessRuleException.class)
     public ProblemDetail handleBusinessRule(BusinessRuleException exception) {
         return problem(UNPROCESSABLE, "Business rule violation", exception.getMessage());

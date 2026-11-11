@@ -4,16 +4,17 @@ import com.splitapp.SplitApp.dto.GroupMemberResponse;
 import com.splitapp.SplitApp.dto.GroupResponse;
 import com.splitapp.SplitApp.entity.GroupRole;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
+import com.splitapp.SplitApp.exception.GroupAccessDeniedException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.security.SecurityConfig;
+import com.splitapp.SplitApp.security.WithMockAppUser;
 import com.splitapp.SplitApp.service.GroupService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -21,14 +22,14 @@ import java.util.List;
 
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @WebMvcTest(GroupController.class)
 @Import(SecurityConfig.class)
-@WithMockUser
+@WithMockAppUser
 class GroupControllerTest {
     @Autowired
     private MockMvc mockMvc;
@@ -45,7 +46,7 @@ class GroupControllerTest {
         mockMvc.perform(post("/groups")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"groupName":"Wyjazd","userId":1}
+                                {"groupName":"Wyjazd"}
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.groupName").value("Wyjazd"))
@@ -59,19 +60,7 @@ class GroupControllerTest {
         mockMvc.perform(post("/groups")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"groupName":" ","userId":1}
-                                """))
-                .andExpect(status().isBadRequest());
-
-        verifyNoInteractions(groupService);
-    }
-
-    @Test
-    void shouldRejectMissingUserId() throws Exception {
-        mockMvc.perform(post("/groups")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"groupName":"Wyjazd"}
+                                {"groupName":" "}
                                 """))
                 .andExpect(status().isBadRequest());
 
@@ -80,13 +69,13 @@ class GroupControllerTest {
 
     @Test
     void shouldReturnNotFoundWhenUserDoesNotExist() throws Exception {
-        when(groupService.createGroup("Wyjazd", null, 99L))
+        when(groupService.createGroup("Wyjazd", null, 1L))
                 .thenThrow(new UserNotFoundException("User not found"));
 
         mockMvc.perform(post("/groups")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"groupName":"Wyjazd","userId":99}
+                                {"groupName":"Wyjazd"}
                                 """))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("User not found"))
@@ -98,8 +87,8 @@ class GroupControllerTest {
         mockMvc.perform(post("/groups")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                            {"groupName":"%s","userId":1}
-                            """.formatted("a".repeat(101))))
+                                {"groupName":"%s"}
+                                """.formatted("a".repeat(101))))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(groupService);
@@ -116,18 +105,6 @@ class GroupControllerTest {
     }
 
     @Test
-    void shouldRejectNonNumericUserId() throws Exception {
-        mockMvc.perform(post("/groups")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                            {"groupName":"Wyjazd","userId":"abc"}
-                            """))
-                .andExpect(status().isBadRequest());
-
-        verifyNoInteractions(groupService);
-    }
-
-    @Test
     void shouldCreateGroupWithDescription() throws Exception {
         GroupResponse response = new GroupResponse(1L, "Wyjazd", "Weekend w górach", 1L,
                 List.of(new GroupMemberResponse(1L, "Jan", "Kowalski", GroupRole.OWNER)));
@@ -136,7 +113,7 @@ class GroupControllerTest {
         mockMvc.perform(post("/groups")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"groupName":"Wyjazd","groupDescription":"Weekend w górach","userId":1}
+                                {"groupName":"Wyjazd","groupDescription":"Weekend w górach"}
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.groupDescription").value("Weekend w górach"));
@@ -147,7 +124,7 @@ class GroupControllerTest {
         mockMvc.perform(post("/groups")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"groupName":"Wyjazd","groupDescription":"%s","userId":1}
+                                {"groupName":"Wyjazd","groupDescription":"%s"}
                                 """.formatted("a".repeat(256))))
                 .andExpect(status().isBadRequest());
 
@@ -159,7 +136,7 @@ class GroupControllerTest {
         GroupResponse response = new GroupResponse(1L, "Wyjazd", null, 1L,
                 List.of(new GroupMemberResponse(1L, "Jan", "Kowalski", GroupRole.OWNER),
                         new GroupMemberResponse(2L, "Anna", "Nowak", GroupRole.MEMBER)));
-        when(groupService.addMember(1L, 2L)).thenReturn(response);
+        when(groupService.addMember(1L, 1L, 2L)).thenReturn(response);
 
         mockMvc.perform(post("/groups/1/members")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -184,7 +161,7 @@ class GroupControllerTest {
 
     @Test
     void shouldReturn404WhenAddingMemberToUnknownGroup() throws Exception {
-        when(groupService.addMember(99L, 2L))
+        when(groupService.addMember(99L, 1L, 2L))
                 .thenThrow(new GroupNotFoundException("Group not found"));
 
         mockMvc.perform(post("/groups/99/members")
@@ -198,7 +175,7 @@ class GroupControllerTest {
 
     @Test
     void shouldReturn422WhenUserIsAlreadyMember() throws Exception {
-        when(groupService.addMember(1L, 2L))
+        when(groupService.addMember(1L, 1L, 2L))
                 .thenThrow(new BusinessRuleException("User is already a member of this group"));
 
         mockMvc.perform(post("/groups/1/members")
@@ -214,7 +191,7 @@ class GroupControllerTest {
     void shouldReturnGroup() throws Exception {
         GroupResponse response = new GroupResponse(1L, "Wyjazd", null, 1L,
                 List.of(new GroupMemberResponse(1L, "Jan", "Kowalski", GroupRole.OWNER)));
-        when(groupService.getGroup(1L)).thenReturn(response);
+        when(groupService.getGroup(1L, 1L)).thenReturn(response);
 
         mockMvc.perform(get("/groups/1"))
                 .andExpect(status().isOk())
@@ -225,7 +202,7 @@ class GroupControllerTest {
 
     @Test
     void shouldReturn404WhenGettingUnknownGroup() throws Exception {
-        when(groupService.getGroup(99L)).thenThrow(new GroupNotFoundException("Group not found"));
+        when(groupService.getGroup(99L, 1L)).thenThrow(new GroupNotFoundException("Group not found"));
 
         mockMvc.perform(get("/groups/99"))
                 .andExpect(status().isNotFound())
@@ -238,5 +215,16 @@ class GroupControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(groupService);
+    }
+
+    @Test
+    void shouldReturn403WhenUserIsNotGroupMember() throws Exception {
+        when(groupService.getGroup(1L, 1L))
+                .thenThrow(new GroupAccessDeniedException("You are not a member of this group"));
+
+        mockMvc.perform(get("/groups/1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"))
+                .andExpect(jsonPath("$.detail").value("You are not a member of this group"));
     }
 }

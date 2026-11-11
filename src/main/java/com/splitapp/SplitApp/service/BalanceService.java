@@ -26,9 +26,11 @@ public class BalanceService {
     private final GroupRepository groupRepository;
     private final ExpenseRepository expenseRepository;
     private final PaymentRepository paymentRepository;
+    private final GroupAccess groupAccess;
 
     @Transactional(readOnly = true)
-    public GroupBalancesResponse getBalances(@NotNull Long groupId) {
+    public GroupBalancesResponse getBalances(@NotNull Long groupId, @NotNull Long currentUserId) {
+        groupAccess.requireMember(groupId, currentUserId);
         ExpenseGroup group = groupRepository.findWithMembersById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
         List<Expense> expenses = expenseRepository.findAllByGroupIdOrderByCreatedAtDescIdDesc(groupId);

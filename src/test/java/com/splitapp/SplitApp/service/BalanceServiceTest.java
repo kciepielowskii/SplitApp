@@ -10,6 +10,7 @@ import com.splitapp.SplitApp.entity.ExpenseSplit;
 import com.splitapp.SplitApp.entity.GroupRole;
 import com.splitapp.SplitApp.entity.Payment;
 import com.splitapp.SplitApp.entity.User;
+import com.splitapp.SplitApp.exception.GroupAccessDeniedException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.repository.ExpenseRepository;
 import com.splitapp.SplitApp.repository.GroupRepository;
@@ -29,11 +30,15 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class BalanceServiceTest {
     private static final Long GROUP_ID = 10L;
+    private static final Long CURRENT_USER_ID = 1L;
 
     @Mock
     private GroupRepository groupRepository;
@@ -43,6 +48,9 @@ class BalanceServiceTest {
 
     @Mock
     private PaymentRepository paymentRepository;
+
+    @Mock
+    private GroupAccess groupAccess;
 
     @InjectMocks
     private BalanceService balanceService;
@@ -64,8 +72,9 @@ class BalanceServiceTest {
         when(paymentRepository.findAllByGroupIdOrderByPaidAtDescIdDesc(GROUP_ID))
                 .thenReturn(List.of(payment));
 
-        GroupBalancesResponse result = balanceService.getBalances(GROUP_ID);
+        GroupBalancesResponse result = balanceService.getBalances(GROUP_ID, CURRENT_USER_ID);
 
+        verify(groupAccess).requireMember(GROUP_ID, CURRENT_USER_ID);
         Map<Long, BigDecimal> byUser = result.balances().stream()
                 .collect(Collectors.toMap(MemberBalanceResponse::userId, MemberBalanceResponse::balance));
         assertEquals(new BigDecimal("10.00"), byUser.get(1L));
@@ -79,7 +88,18 @@ class BalanceServiceTest {
     void shouldThrowWhenGroupDoesNotExist() {
         when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.empty());
 
-        assertThrows(GroupNotFoundException.class, () -> balanceService.getBalances(GROUP_ID));
+        assertThrows(GroupNotFoundException.class,
+                () -> balanceService.getBalances(GROUP_ID, CURRENT_USER_ID));
+    }
+
+    @Test
+    void shouldNotReturnBalancesWhenCallerIsNotMember() {
+        doThrow(new GroupAccessDeniedException("You are not a member of this group"))
+                .when(groupAccess).requireMember(GROUP_ID, 9L);
+
+        assertThrows(GroupAccessDeniedException.class, () -> balanceService.getBalances(GROUP_ID, 9L));
+
+        verifyNoInteractions(groupRepository, expenseRepository, paymentRepository);
     }
 
     private static User user(Long id) {

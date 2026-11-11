@@ -3,10 +3,12 @@ package com.splitapp.SplitApp.controller;
 import com.splitapp.SplitApp.dto.AddMemberRequest;
 import com.splitapp.SplitApp.dto.CreateGroupRequest;
 import com.splitapp.SplitApp.dto.GroupResponse;
+import com.splitapp.SplitApp.security.AppUserDetails;
 import com.splitapp.SplitApp.service.GroupService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,20 +25,23 @@ public class GroupController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public GroupResponse createGroup(@Valid @RequestBody CreateGroupRequest request) {
+    public GroupResponse createGroup(@Valid @RequestBody CreateGroupRequest request,
+                                     @AuthenticationPrincipal AppUserDetails currentUser) {
         return groupService.createGroup(
-                request.groupName(), request.groupDescription(), request.userId());
+                request.groupName(), request.groupDescription(), currentUser.getId());
     }
 
     @PostMapping("/{groupId}/members")
     @ResponseStatus(HttpStatus.CREATED)
     public GroupResponse addMember(@PathVariable Long groupId,
-                                   @Valid @RequestBody AddMemberRequest request) {
-        return groupService.addMember(groupId, request.userId());
+                                   @Valid @RequestBody AddMemberRequest request,
+                                   @AuthenticationPrincipal AppUserDetails currentUser) {
+        return groupService.addMember(groupId, currentUser.getId(), request.userId());
     }
 
     @GetMapping("/{groupId}")
-    public GroupResponse getGroup(@PathVariable Long groupId) {
-        return groupService.getGroup(groupId);
+    public GroupResponse getGroup(@PathVariable Long groupId,
+                                  @AuthenticationPrincipal AppUserDetails currentUser) {
+        return groupService.getGroup(groupId, currentUser.getId());
     }
 }

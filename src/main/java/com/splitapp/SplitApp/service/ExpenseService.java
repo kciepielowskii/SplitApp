@@ -36,10 +36,12 @@ public class ExpenseService {
     private final ExpenseRepository expenseRepository;
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
+    private final GroupAccess groupAccess;
 
     @Transactional
-    public ExpenseResponse createExpense(@NotNull Long groupId,
+    public ExpenseResponse createExpense(@NotNull Long groupId, @NotNull Long currentUserId,
                                          @NotNull @Valid CreateExpenseRequest request) {
+        groupAccess.requireMember(groupId, currentUserId);
         ExpenseGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
 
@@ -117,10 +119,8 @@ public class ExpenseService {
     }
 
     @Transactional(readOnly = true)
-    public List<ExpenseResponse> getExpenses(@NotNull Long groupId) {
-        if (!groupRepository.existsById(groupId)) {
-            throw new GroupNotFoundException("Group not found");
-        }
+    public List<ExpenseResponse> getExpenses(@NotNull Long groupId, @NotNull Long currentUserId) {
+        groupAccess.requireMember(groupId, currentUserId);
         return expenseRepository.findAllByGroupIdOrderByCreatedAtDescIdDesc(groupId).stream()
                 .map(ExpenseResponse::from)
                 .toList();

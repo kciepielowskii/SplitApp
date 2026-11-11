@@ -13,7 +13,7 @@ class RequestNormalizationTest {
 
     @Test
     void shouldTrimGroupNameAndDescription() {
-        CreateGroupRequest request = new CreateGroupRequest("  Wyjazd ", "  Góry ", 1L);
+        CreateGroupRequest request = new CreateGroupRequest("  Wyjazd ", "  Góry ");
 
         assertEquals("Wyjazd", request.groupName());
         assertEquals("Góry", request.groupDescription());
@@ -21,7 +21,7 @@ class RequestNormalizationTest {
 
     @Test
     void shouldTurnBlankGroupDescriptionIntoNull() {
-        CreateGroupRequest request = new CreateGroupRequest("Wyjazd", "   ", 1L);
+        CreateGroupRequest request = new CreateGroupRequest("Wyjazd", "   ");
 
         assertNull(request.groupDescription());
     }
