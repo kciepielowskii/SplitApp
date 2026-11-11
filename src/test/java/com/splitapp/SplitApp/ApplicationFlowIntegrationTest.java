@@ -194,6 +194,23 @@ class ApplicationFlowIntegrationTest {
     }
 
     @Test
+    void shouldReturnMembersInTheOrderTheyJoined() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser first = registerUser(uniqueEmail());
+        TestUser second = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, second);
+        addMember(groupId, owner, first);
+
+        fetch(owner, "/groups/%d".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members.length()").value(3))
+                .andExpect(jsonPath("$.members[0].userId").value(owner.id()))
+                .andExpect(jsonPath("$.members[1].userId").value(second.id()))
+                .andExpect(jsonPath("$.members[2].userId").value(first.id()));
+    }
+
+    @Test
     void shouldReturn404WhenGettingUnknownGroup() throws Exception {
         TestUser user = registerUser(uniqueEmail());
 
