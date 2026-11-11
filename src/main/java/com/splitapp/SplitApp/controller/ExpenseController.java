@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,5 +37,12 @@ public class ExpenseController {
     public List<ExpenseResponse> getExpenses(@PathVariable Long groupId,
                                              @AuthenticationPrincipal AppUserDetails currentUser) {
         return expenseService.getExpenses(groupId, currentUser.getId());
+    }
+
+    @DeleteMapping("/{expenseId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteExpense(@PathVariable Long groupId, @PathVariable Long expenseId,
+                              @AuthenticationPrincipal AppUserDetails currentUser) {
+        expenseService.deleteExpense(groupId, currentUser.getId(), expenseId);
     }
 }

@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -493,6 +494,81 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(2));
     }
 
+    @Test
+    void shouldDeleteExpenseAndRestoreBalances() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        long expenseId = createSharedExpense(groupId, owner, friend, "10.00");
+
+        remove(owner, "/groups/%d/expenses/%d".formatted(groupId, expenseId))
+                .andExpect(status().isNoContent());
+
+        fetch(owner, "/groups/%d/expenses".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        fetch(owner, "/groups/%d/balances".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transfers.length()").value(0));
+    }
+
+    @Test
+    void shouldAllowOnlyAuthorOrOwnerToDeleteAnExpense() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        TestUser third = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        addMember(groupId, owner, third);
+        long expenseId = createSharedExpense(groupId, friend, third, "10.00");
+        String url = "/groups/%d/expenses/%d".formatted(groupId, expenseId);
+
+        remove(third, url)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"));
+        remove(owner, url).andExpect(status().isNoContent());
+        remove(owner, url)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Expense not found"));
+    }
+
+    @Test
+    void shouldAllowOnlyAuthorOrOwnerToDeleteAPayment() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        TestUser third = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        addMember(groupId, owner, third);
+        long paymentId = createPayment(groupId, friend, third, "5.00");
+        String url = "/groups/%d/payments/%d".formatted(groupId, paymentId);
+
+        remove(third, url)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"));
+        remove(friend, url).andExpect(status().isNoContent());
+
+        fetch(owner, "/groups/%d/payments".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void shouldReturn404ForEntryOfAnotherGroupAndForbidNonMembers() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser other = registerUser(uniqueEmail());
+        long groupA = createGroup(owner);
+        long groupB = createGroup(other);
+        long expenseId = createExpense(groupA, owner, "10.00");
+
+        remove(other, "/groups/%d/expenses/%d".formatted(groupB, expenseId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Expense not found"));
+        remove(other, "/groups/%d/expenses/%d".formatted(groupA, expenseId))
+                .andExpect(status().isForbidden());
+    }
+
     private record TestUser(long id, String email) {
     }
 
@@ -511,6 +587,15 @@ class ApplicationFlowIntegrationTest {
         return mockMvc.perform(get(url).with(as(user)));
     }
 
+    private ResultActions remove(TestUser user, String url) throws Exception {
+        return mockMvc.perform(delete(url).with(as(user)));
+    }
+
+    private static long idOf(MvcResult result) throws Exception {
+        Number id = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
+        return id.longValue();
+    }
+
     private TestUser registerUser(String email) throws Exception {
         MvcResult result = mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -520,19 +605,15 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.password").doesNotExist())
                 .andReturn();
 
-        Number id = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
-        return new TestUser(id.longValue(), email);
+        return new TestUser(idOf(result), email);
     }
 
     private long createGroup(TestUser owner) throws Exception {
-        MvcResult result = send(owner, "/groups", """
+        return idOf(send(owner, "/groups", """
                 {"groupName":"Wyjazd"}
                 """)
                 .andExpect(status().isCreated())
-                .andReturn();
-
-        Number id = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
-        return id.longValue();
+                .andReturn());
     }
 
     private void addMember(long groupId, TestUser actor, TestUser newMember) throws Exception {
@@ -542,27 +623,30 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(status().isCreated());
     }
 
-    private void createExpense(long groupId, TestUser payer, String amount) throws Exception {
-        send(payer, "/groups/%d/expenses".formatted(groupId), """
+    private long createExpense(long groupId, TestUser payer, String amount) throws Exception {
+        return idOf(send(payer, "/groups/%d/expenses".formatted(groupId), """
                 {"amount":%s,"category":"FOOD","paidById":%d,"participantIds":[%d]}
                 """.formatted(amount, payer.id(), payer.id()))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn());
     }
 
-    private void createSharedExpense(long groupId, TestUser payer, TestUser other, String amount)
+    private long createSharedExpense(long groupId, TestUser payer, TestUser other, String amount)
             throws Exception {
-        send(payer, "/groups/%d/expenses".formatted(groupId), """
+        return idOf(send(payer, "/groups/%d/expenses".formatted(groupId), """
                 {"amount":%s,"category":"FOOD","paidById":%d,"participantIds":[%d,%d]}
                 """.formatted(amount, payer.id(), payer.id(), other.id()))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn());
     }
 
-    private void createPayment(long groupId, TestUser sender, TestUser receiver, String amount)
+    private long createPayment(long groupId, TestUser sender, TestUser receiver, String amount)
             throws Exception {
-        send(sender, "/groups/%d/payments".formatted(groupId), """
+        return idOf(send(sender, "/groups/%d/payments".formatted(groupId), """
                 {"senderId":%d,"receiverId":%d,"amount":%s}
                 """.formatted(sender.id(), receiver.id(), amount))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn());
     }
 
     private static String registerBody(String email) {

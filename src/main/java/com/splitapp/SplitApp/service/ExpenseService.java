@@ -9,6 +9,8 @@ import com.splitapp.SplitApp.entity.ExpenseGroup;
 import com.splitapp.SplitApp.entity.ExpenseSplit;
 import com.splitapp.SplitApp.entity.User;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
+import com.splitapp.SplitApp.exception.ExpenseNotFoundException;
+import com.splitapp.SplitApp.exception.GroupAccessDeniedException;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.repository.ExpenseRepository;
@@ -126,5 +128,21 @@ public class ExpenseService {
         return expenseRepository.findAllByGroupIdOrderByCreatedAtDescIdDesc(groupId).stream()
                 .map(ExpenseResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public void deleteExpense(@NotNull Long groupId, @NotNull Long currentUserId,
+                              @NotNull Long expenseId) {
+        groupAccess.requireMember(groupId, currentUserId);
+        Expense expense = expenseRepository.findByIdAndGroupId(expenseId, groupId)
+                .orElseThrow(() -> new ExpenseNotFoundException("Expense not found"));
+
+        boolean isAuthor = expense.getCreatedBy().getId().equals(currentUserId);
+        if (!isAuthor && !expense.getGroup().isOwner(currentUserId)) {
+            throw new GroupAccessDeniedException(
+                    "Only the author or the group owner can delete this expense");
+        }
+
+        expenseRepository.delete(expense);
     }
 }
