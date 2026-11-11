@@ -264,6 +264,48 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.title").value("Group not found"));
     }
 
+    @Test
+    void shouldComputeBalancesAndClearThemAfterPayment() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long friendId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+        addMember(groupId, friendId);
+        createSharedExpense(groupId, ownerId, friendId, "10.00");
+
+        mockMvc.perform(get("/groups/%d/balances".formatted(groupId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balances[?(@.userId==%d)].balance", ownerId).value(5.0))
+                .andExpect(jsonPath("$.balances[?(@.userId==%d)].balance", friendId).value(-5.0))
+                .andExpect(jsonPath("$.transfers.length()").value(1))
+                .andExpect(jsonPath("$.transfers[0].fromUserId").value(friendId))
+                .andExpect(jsonPath("$.transfers[0].toUserId").value(ownerId))
+                .andExpect(jsonPath("$.transfers[0].amount").value(5.0));
+
+        createPayment(groupId, friendId, ownerId, "5.00");
+
+        mockMvc.perform(get("/groups/%d/balances".formatted(groupId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balances[?(@.userId==%d)].balance", ownerId).value(0.0))
+                .andExpect(jsonPath("$.balances[?(@.userId==%d)].balance", friendId).value(0.0))
+                .andExpect(jsonPath("$.transfers.length()").value(0));
+    }
+
+    @Test
+    void shouldReturn404WhenGettingBalancesOfUnknownGroup() throws Exception {
+        mockMvc.perform(get("/groups/999999/balances"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
+    private void createSharedExpense(long groupId, long payerId, long otherId, String amount) throws Exception {
+        mockMvc.perform(post("/groups/%d/expenses".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":%s,"category":"FOOD","paidById":%d,"participantIds":[%d,%d]}
+                                """.formatted(amount, payerId, payerId, otherId)))
+                .andExpect(status().isCreated());
+    }
+
     private long registerUser(String email) throws Exception {
         MvcResult result = mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
