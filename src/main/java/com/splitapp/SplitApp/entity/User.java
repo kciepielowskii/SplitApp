@@ -73,7 +73,7 @@ public class User {
         this.email = normalizeEmail(email);
     }
 
-    private static String normalizeEmail(String email) {
+    public static String normalizeEmail(String email) {
         return Objects.requireNonNull(email, "Email is required")
                 .trim()
                 .toLowerCase(Locale.ROOT);
