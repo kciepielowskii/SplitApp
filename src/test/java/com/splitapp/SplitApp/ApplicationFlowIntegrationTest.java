@@ -266,7 +266,7 @@ class ApplicationFlowIntegrationTest {
     }
 
     @Test
-    void shouldComputeBalancesAndClearThemAfterPayment() throws Exception {
+    void shouldComputeBalancesAndClearThemOnceTheReceiverConfirmsPayment() throws Exception {
         TestUser owner = registerUser(uniqueEmail());
         TestUser friend = registerUser(uniqueEmail());
         long groupId = createGroup(owner);
@@ -282,13 +282,76 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.transfers[0].toUserId").value(owner.id()))
                 .andExpect(jsonPath("$.transfers[0].amount").value(5.0));
 
-        createPayment(groupId, friend, owner, "5.00");
+        long paymentId = createPayment(groupId, friend, owner, "5.00");
+
+        // recorded by the sender, so it does not count until the receiver confirms it
+        fetch(owner, "/groups/%d/balances".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balances[?(@.userId==%d)].balance", owner.id()).value(5.0))
+                .andExpect(jsonPath("$.balances[?(@.userId==%d)].balance", friend.id()).value(-5.0))
+                .andExpect(jsonPath("$.transfers.length()").value(1));
+
+        send(owner, "/groups/%d/payments/%d/confirm".formatted(groupId, paymentId), "")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
         fetch(owner, "/groups/%d/balances".formatted(groupId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.balances[?(@.userId==%d)].balance", owner.id()).value(0.0))
                 .andExpect(jsonPath("$.balances[?(@.userId==%d)].balance", friend.id()).value(0.0))
                 .andExpect(jsonPath("$.transfers.length()").value(0));
+    }
+
+    @Test
+    void shouldCountPaymentRecordedByReceiverAtOnce() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        createSharedExpense(groupId, owner, friend, "10.00");
+
+        send(owner, "/groups/%d/payments".formatted(groupId), """
+                {"senderId":%d,"receiverId":%d,"amount":5.00}
+                """.formatted(friend.id(), owner.id()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+
+        fetch(owner, "/groups/%d/balances".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transfers.length()").value(0));
+    }
+
+    @Test
+    void shouldAllowOnlyTheReceiverToConfirmAPayment() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        TestUser third = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        addMember(groupId, owner, third);
+        long paymentId = createPayment(groupId, friend, third, "5.00");
+        String url = "/groups/%d/payments/%d/confirm".formatted(groupId, paymentId);
+
+        fetch(owner, "/groups/%d/payments".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("PENDING"));
+
+        for (TestUser caller : List.of(friend, owner)) {
+            send(caller, url, "")
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.detail")
+                            .value("Only the receiver can confirm this payment"));
+        }
+
+        send(third, url, "")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+        send(third, url, "")
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value("Payment is already confirmed"));
+        send(third, "/groups/%d/payments/999999/confirm".formatted(groupId), "")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Payment not found"));
     }
 
     @Test

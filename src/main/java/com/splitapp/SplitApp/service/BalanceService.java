@@ -5,6 +5,7 @@ import com.splitapp.SplitApp.dto.MemberBalanceResponse;
 import com.splitapp.SplitApp.entity.Expense;
 import com.splitapp.SplitApp.entity.ExpenseGroup;
 import com.splitapp.SplitApp.entity.Payment;
+import com.splitapp.SplitApp.entity.PaymentStatus;
 import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.repository.ExpenseRepository;
 import com.splitapp.SplitApp.repository.GroupRepository;
@@ -34,7 +35,8 @@ public class BalanceService {
         ExpenseGroup group = groupRepository.findWithMembersById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
         List<Expense> expenses = expenseRepository.findAllByGroupIdOrderByCreatedAtDescIdDesc(groupId);
-        List<Payment> payments = paymentRepository.findAllByGroupIdOrderByPaidAtDescIdDesc(groupId);
+        List<Payment> payments =
+                paymentRepository.findAllByGroupIdAndStatus(groupId, PaymentStatus.CONFIRMED);
 
         Map<Long, Long> net = BalanceCalculator.netCents(expenses, payments);
 

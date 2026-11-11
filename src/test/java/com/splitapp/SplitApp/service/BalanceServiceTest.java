@@ -15,6 +15,7 @@ import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.repository.ExpenseRepository;
 import com.splitapp.SplitApp.repository.GroupRepository;
 import com.splitapp.SplitApp.repository.PaymentRepository;
+import com.splitapp.SplitApp.entity.PaymentStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -65,11 +66,11 @@ class BalanceServiceTest {
         expense.addSplit(new ExpenseSplit(u1, new BigDecimal("10.00")));
         expense.addSplit(new ExpenseSplit(u2, new BigDecimal("10.00")));
         expense.addSplit(new ExpenseSplit(u3, new BigDecimal("10.00")));
-        Payment payment = new Payment(group, u2, u1, new BigDecimal("10.00"), u2);
+        Payment payment = new Payment(group, u2, u1, new BigDecimal("10.00"), u1);
         when(groupRepository.findWithMembersById(GROUP_ID)).thenReturn(Optional.of(group));
         when(expenseRepository.findAllByGroupIdOrderByCreatedAtDescIdDesc(GROUP_ID))
                 .thenReturn(List.of(expense));
-        when(paymentRepository.findAllByGroupIdOrderByPaidAtDescIdDesc(GROUP_ID))
+        when(paymentRepository.findAllByGroupIdAndStatus(GROUP_ID, PaymentStatus.CONFIRMED))
                 .thenReturn(List.of(payment));
 
         GroupBalancesResponse result = balanceService.getBalances(GROUP_ID, CURRENT_USER_ID);

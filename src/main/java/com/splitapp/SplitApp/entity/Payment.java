@@ -2,6 +2,8 @@ package com.splitapp.SplitApp.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -52,6 +54,10 @@ public class Payment {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private PaymentStatus status;
+
     @Column(nullable = false, updatable = false)
     private Instant paidAt;
 
@@ -62,6 +68,9 @@ public class Payment {
         this.receiver = Objects.requireNonNull(receiver, "Receiver is required");
         this.amount = Objects.requireNonNull(amount, "Amount is required");
         this.createdBy = Objects.requireNonNull(createdBy, "Author is required");
+        this.status = User.sameUser(createdBy, receiver)
+                ? PaymentStatus.CONFIRMED
+                : PaymentStatus.PENDING;
 
         if (User.sameUser(sender, receiver)) {
             throw new IllegalArgumentException("Sender and receiver must differ");
@@ -72,6 +81,10 @@ public class Payment {
         if (!group.hasMember(receiver)) {
             throw new IllegalArgumentException("Receiver is not a member of this group");
         }
+    }
+
+    public void confirm() {
+        this.status = PaymentStatus.CONFIRMED;
     }
 
     @PrePersist

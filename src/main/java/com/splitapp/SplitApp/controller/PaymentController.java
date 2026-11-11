@@ -39,6 +39,12 @@ public class PaymentController {
         return paymentService.getPayments(groupId, currentUser.getId());
     }
 
+    @PostMapping("/{paymentId}/confirm")
+    public PaymentResponse confirmPayment(@PathVariable Long groupId, @PathVariable Long paymentId,
+                                          @AuthenticationPrincipal AppUserDetails currentUser) {
+        return paymentService.confirmPayment(groupId, currentUser.getId(), paymentId);
+    }
+
     @DeleteMapping("/{paymentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletePayment(@PathVariable Long groupId, @PathVariable Long paymentId,
