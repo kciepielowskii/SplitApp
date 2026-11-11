@@ -11,5 +11,4 @@ class SplitAppApplicationTests {
 	@Test
 	void contextLoads() {
 	}
-
 }

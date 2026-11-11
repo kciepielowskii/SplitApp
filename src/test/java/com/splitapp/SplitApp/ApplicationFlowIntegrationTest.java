@@ -64,30 +64,6 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.title").value("User not found"));
     }
 
-    private long registerUser(String email) throws Exception {
-        MvcResult result = mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(registerBody(email)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.email").value(email))
-                .andExpect(jsonPath("$.password").doesNotExist())
-                .andReturn();
-
-        Number id = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
-        return id.longValue();
-    }
-
-    private static String registerBody(String email) {
-        return """
-                {"firstName":"Jan","lastName":"Kowalski","email":"%s","password":"secret123"}
-                """.formatted(email);
-    }
-
-    // the database is shared between tests in this class and is not rolled back
-    private static String uniqueEmail() {
-        return "e2e-" + UUID.randomUUID() + "@example.com";
-    }
-
     @Test
     void shouldCreateExpenseInGroup() throws Exception {
         long userId = registerUser(uniqueEmail());
@@ -131,19 +107,6 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.title").value("Group not found"));
     }
 
-    private long createGroup(long userId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/groups")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"groupName":"Wyjazd","userId":%d}
-                                """.formatted(userId)))
-                .andExpect(status().isCreated())
-                .andReturn();
-
-        Number id = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
-        return id.longValue();
-    }
-
     @Test
     void shouldReturn422WhenPaymentReceiverIsNotInGroup() throws Exception {
         long ownerId = registerUser(uniqueEmail());
@@ -169,5 +132,117 @@ class ApplicationFlowIntegrationTest {
                                 """))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
+    @Test
+    void shouldSplitExpenseBetweenGroupMembers() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long friendId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+        addMember(groupId, friendId);
+
+        mockMvc.perform(post("/groups/%d/expenses".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":10.00,"category":"FOOD","paidById":%d,"participantIds":[%d,%d]}
+                                """.formatted(ownerId, ownerId, friendId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.splits[0].userId").value(ownerId))
+                .andExpect(jsonPath("$.splits[0].amount").value(5.0))
+                .andExpect(jsonPath("$.splits[1].userId").value(friendId))
+                .andExpect(jsonPath("$.splits[1].amount").value(5.0));
+    }
+
+    @Test
+    void shouldRecordPaymentBetweenGroupMembers() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long friendId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+        addMember(groupId, friendId);
+
+        mockMvc.perform(post("/groups/%d/payments".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"senderId":%d,"receiverId":%d,"amount":10.00}
+                                """.formatted(friendId, ownerId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.senderId").value(friendId))
+                .andExpect(jsonPath("$.receiverId").value(ownerId))
+                .andExpect(jsonPath("$.amount").value(10.0))
+                .andExpect(jsonPath("$.paidAt").isNotEmpty());
+    }
+
+    @Test
+    void shouldReturn422WhenAddingSameMemberTwice() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+
+        mockMvc.perform(post("/groups/%d/members".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":%d}
+                                """.formatted(ownerId)))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value("User is already a member of this group"));
+    }
+
+    @Test
+    void shouldReturn404WhenAddingUnknownUserToGroup() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+
+        mockMvc.perform(post("/groups/%d/members".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":999999}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("User not found"));
+    }
+
+    private long registerUser(String email) throws Exception {
+        MvcResult result = mockMvc.perform(post("/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerBody(email)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value(email))
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andReturn();
+
+        Number id = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
+        return id.longValue();
+    }
+
+    private long createGroup(long userId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"groupName":"Wyjazd","userId":%d}
+                                """.formatted(userId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        Number id = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
+        return id.longValue();
+    }
+
+    private void addMember(long groupId, long userId) throws Exception {
+        mockMvc.perform(post("/groups/%d/members".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":%d}
+                                """.formatted(userId)))
+                .andExpect(status().isCreated());
+    }
+
+    private static String registerBody(String email) {
+        return """
+                {"firstName":"Jan","lastName":"Kowalski","email":"%s","password":"secret123"}
+                """.formatted(email);
+    }
+
+    // the database is shared between tests in this class and is not rolled back
+    private static String uniqueEmail() {
+        return "e2e-" + UUID.randomUUID() + "@example.com";
     }
 }
