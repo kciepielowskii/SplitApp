@@ -16,6 +16,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -118,5 +120,22 @@ class ExpenseControllerTest {
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.title").value("Business rule violation"))
                 .andExpect(jsonPath("$.detail").value("Payer is not a member of this group"));
+    }
+
+    @Test
+    void shouldRejectMoreThan100Participants() throws Exception {
+        String ids = IntStream.rangeClosed(1, 101)
+                .mapToObj(String::valueOf)
+                .collect(Collectors.joining(","));
+
+        mockMvc.perform(post("/groups/1/expenses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":10.00,"category":"FOOD","paidById":1,"participantIds":[%s]}
+                                """.formatted(ids)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.participantIds").exists());
+
+        verifyNoInteractions(expenseService);
     }
 }
