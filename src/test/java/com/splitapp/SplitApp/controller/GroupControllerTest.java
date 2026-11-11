@@ -33,7 +33,7 @@ class GroupControllerTest {
     void shouldCreateGroup() throws Exception {
         GroupResponse response = new GroupResponse(1L, "Wyjazd", null, 1L,
                 List.of(new GroupMemberResponse(1L, "Jan", "Kowalski", GroupRole.OWNER)));
-        when(groupService.createGroup("Wyjazd", 1L)).thenReturn(response);
+        when(groupService.createGroup("Wyjazd", null, 1L)).thenReturn(response);
 
         mockMvc.perform(post("/groups")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -74,7 +74,7 @@ class GroupControllerTest {
 
     @Test
     void shouldReturnNotFoundWhenUserDoesNotExist() throws Exception {
-        when(groupService.createGroup("Wyjazd", 99L))
+        when(groupService.createGroup("Wyjazd", null, 99L))
                 .thenThrow(new UserNotFoundException("User not found"));
 
         mockMvc.perform(post("/groups")
@@ -114,6 +114,33 @@ class GroupControllerTest {
                         .content("""
                             {"groupName":"Wyjazd","userId":"abc"}
                             """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(groupService);
+    }
+
+    @Test
+    void shouldCreateGroupWithDescription() throws Exception {
+        GroupResponse response = new GroupResponse(1L, "Wyjazd", "Weekend w górach", 1L,
+                List.of(new GroupMemberResponse(1L, "Jan", "Kowalski", GroupRole.OWNER)));
+        when(groupService.createGroup("Wyjazd", "Weekend w górach", 1L)).thenReturn(response);
+
+        mockMvc.perform(post("/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"groupName":"Wyjazd","groupDescription":"Weekend w górach","userId":1}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.groupDescription").value("Weekend w górach"));
+    }
+
+    @Test
+    void shouldRejectGroupDescriptionLongerThan255Characters() throws Exception {
+        mockMvc.perform(post("/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"groupName":"Wyjazd","groupDescription":"%s","userId":1}
+                                """.formatted("a".repeat(256))))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(groupService);
