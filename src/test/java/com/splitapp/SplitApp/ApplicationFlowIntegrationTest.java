@@ -889,6 +889,27 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(status().isNoContent());
     }
 
+    @Test
+    void shouldRejectPostsThatAnHtmlFormCouldSend() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        long paymentId = createPayment(groupId, friend, owner, "5.00");
+        String url = "/groups/%d/payments/%d/confirm".formatted(groupId, paymentId);
+
+        // valid credentials, but a form content type, or no content type at all
+        mockMvc.perform(post(url).with(as(owner))
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(status().isUnsupportedMediaType());
+        mockMvc.perform(post(url).with(as(owner)))
+                .andExpect(status().isUnsupportedMediaType());
+
+        fetch(owner, "/groups/%d/payments".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("PENDING"));
+    }
+
     private record TestUser(long id, String email) {
     }
 

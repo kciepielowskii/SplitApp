@@ -14,6 +14,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.MediaType;
 
 import java.time.Instant;
 import java.util.List;
@@ -59,7 +60,7 @@ class InvitationControllerTest {
                         new GroupMemberResponse(1L, "Anna", "Nowak", GroupRole.MEMBER)));
         when(invitationService.acceptInvitation(1L, 5L)).thenReturn(response);
 
-        mockMvc.perform(post("/invitations/5/accept"))
+        mockMvc.perform(post("/invitations/5/accept").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.members[1].userId").value(1))
@@ -71,14 +72,14 @@ class InvitationControllerTest {
         when(invitationService.acceptInvitation(1L, 99L))
                 .thenThrow(new InvitationNotFoundException("Invitation not found"));
 
-        mockMvc.perform(post("/invitations/99/accept"))
+        mockMvc.perform(post("/invitations/99/accept").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Invitation not found"));
     }
 
     @Test
     void shouldDeclineInvitation() throws Exception {
-        mockMvc.perform(post("/invitations/5/decline"))
+        mockMvc.perform(post("/invitations/5/decline").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNoContent());
 
         verify(invitationService).declineInvitation(1L, 5L);
@@ -89,14 +90,14 @@ class InvitationControllerTest {
         doThrow(new InvitationNotFoundException("Invitation not found"))
                 .when(invitationService).declineInvitation(1L, 99L);
 
-        mockMvc.perform(post("/invitations/99/decline"))
+        mockMvc.perform(post("/invitations/99/decline").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Invitation not found"));
     }
 
     @Test
     void shouldRejectNonNumericInvitationId() throws Exception {
-        mockMvc.perform(post("/invitations/abc/accept"))
+        mockMvc.perform(post("/invitations/abc/accept").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(invitationService);

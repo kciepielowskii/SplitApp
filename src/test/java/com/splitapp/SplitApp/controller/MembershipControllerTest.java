@@ -94,7 +94,7 @@ class MembershipControllerTest {
 
     @Test
     void shouldLeaveGroup() throws Exception {
-        mockMvc.perform(post("/groups/1/leave"))
+        mockMvc.perform(post("/groups/1/leave").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNoContent());
 
         verify(membershipService).leaveGroup(1L, 1L);
@@ -105,7 +105,7 @@ class MembershipControllerTest {
         doThrow(new BusinessRuleException("Settle your balance before leaving the group"))
                 .when(membershipService).leaveGroup(1L, 1L);
 
-        mockMvc.perform(post("/groups/1/leave"))
+        mockMvc.perform(post("/groups/1/leave").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.detail")
                         .value("Settle your balance before leaving the group"));
@@ -116,7 +116,7 @@ class MembershipControllerTest {
         doThrow(new GroupNotFoundException("Group not found"))
                 .when(membershipService).leaveGroup(99L, 1L);
 
-        mockMvc.perform(post("/groups/99/leave"))
+        mockMvc.perform(post("/groups/99/leave").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Group not found"));
     }
@@ -126,7 +126,7 @@ class MembershipControllerTest {
         doThrow(new GroupAccessDeniedException("You are not a member of this group"))
                 .when(membershipService).leaveGroup(1L, 1L);
 
-        mockMvc.perform(post("/groups/1/leave"))
+        mockMvc.perform(post("/groups/1/leave").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.title").value("Forbidden"));
     }
