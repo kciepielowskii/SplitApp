@@ -52,9 +52,13 @@ class UserControllerTest {
         mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"firstName":"","lastName":"Kowalski","email":"not-an-email","password":"123"}
-                                """))
-                .andExpect(status().isBadRequest());
+                            {"firstName":"","lastName":"Kowalski","email":"not-an-email","password":"123"}
+                            """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Validation failed"))
+                .andExpect(jsonPath("$.errors.firstName").exists())
+                .andExpect(jsonPath("$.errors.email").exists())
+                .andExpect(jsonPath("$.errors.password").exists());
 
         verifyNoInteractions(userService);
     }
