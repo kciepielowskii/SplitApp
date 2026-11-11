@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 public interface ExpenseSplitRepository extends JpaRepository<ExpenseSplit, Long> {
-    List<ExpenseSplit> findAllByExpense_Id(Long expenseId);
+    List<ExpenseSplit> findAllByExpenseId(Long expenseId);
 
     List<ExpenseSplit> findAllByUserId(Long userId);
 }
