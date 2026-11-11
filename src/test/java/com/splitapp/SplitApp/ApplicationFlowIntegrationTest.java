@@ -297,6 +297,56 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.title").value("Group not found"));
     }
 
+    @Test
+    void shouldSplitExpenseByExplicitAmountsAndReflectItInBalances() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long friendId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+        addMember(groupId, friendId);
+
+        mockMvc.perform(post("/groups/%d/expenses".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":10.00,"category":"FOOD","paidById":%d,"splitType":"AMOUNT",
+                                 "shares":[{"userId":%d,"value":3.00},{"userId":%d,"value":7.00}]}
+                                """.formatted(ownerId, ownerId, friendId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.splits[0].amount").value(3.0))
+                .andExpect(jsonPath("$.splits[1].amount").value(7.0));
+
+        mockMvc.perform(get("/groups/%d/balances".formatted(groupId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balances[?(@.userId==%d)].balance", ownerId).value(7.0))
+                .andExpect(jsonPath("$.balances[?(@.userId==%d)].balance", friendId).value(-7.0));
+    }
+
+    @Test
+    void shouldSplitExpenseByPercentagesAndRejectWrongTotal() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long friendId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+        addMember(groupId, friendId);
+
+        mockMvc.perform(post("/groups/%d/expenses".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":10.00,"category":"FOOD","paidById":%d,"splitType":"PERCENT",
+                                 "shares":[{"userId":%d,"value":60},{"userId":%d,"value":40}]}
+                                """.formatted(ownerId, ownerId, friendId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.splits[0].amount").value(6.0))
+                .andExpect(jsonPath("$.splits[1].amount").value(4.0));
+
+        mockMvc.perform(post("/groups/%d/expenses".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":10.00,"category":"FOOD","paidById":%d,"splitType":"PERCENT",
+                                 "shares":[{"userId":%d,"value":60},{"userId":%d,"value":30}]}
+                                """.formatted(ownerId, ownerId, friendId)))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value("Percentages must add up to 100"));
+    }
+
     private void createSharedExpense(long groupId, long payerId, long otherId, String amount) throws Exception {
         mockMvc.perform(post("/groups/%d/expenses".formatted(groupId))
                         .contentType(MediaType.APPLICATION_JSON)

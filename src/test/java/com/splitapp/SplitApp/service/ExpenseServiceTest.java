@@ -3,6 +3,8 @@ package com.splitapp.SplitApp.service;
 import com.splitapp.SplitApp.dto.CreateExpenseRequest;
 import com.splitapp.SplitApp.dto.ExpenseResponse;
 import com.splitapp.SplitApp.dto.ExpenseSplitResponse;
+import com.splitapp.SplitApp.dto.ShareRequest;
+import com.splitapp.SplitApp.dto.SplitType;
 import com.splitapp.SplitApp.entity.Expense;
 import com.splitapp.SplitApp.entity.ExpenseCategory;
 import com.splitapp.SplitApp.entity.ExpenseGroup;
@@ -152,8 +154,14 @@ class ExpenseServiceTest {
     }
 
     private static CreateExpenseRequest request(String amount, Long paidById, List<Long> participantIds) {
-        return new CreateExpenseRequest(new BigDecimal(amount), ExpenseCategory.FOOD,
-                "Obiad", paidById, participantIds);
+        return new CreateExpenseRequest(new BigDecimal(amount), ExpenseCategory.FOOD, "Obiad",
+                paidById, null, participantIds, null);
+    }
+
+    private static CreateExpenseRequest sharesRequest(String amount, Long paidById, SplitType type,
+                                                      ShareRequest... shares) {
+        return new CreateExpenseRequest(new BigDecimal(amount), ExpenseCategory.FOOD, "Obiad",
+                paidById, type, null, List.of(shares));
     }
 
     private static User user(Long id) {
@@ -206,5 +214,89 @@ class ExpenseServiceTest {
         assertThrows(GroupNotFoundException.class, () -> expenseService.getExpenses(GROUP_ID));
 
         verify(expenseRepository, never()).findAllByGroupIdOrderByCreatedAtDescIdDesc(any());
+    }
+
+    @Test
+    void shouldStoreExplicitAmounts() {
+        User u1 = user(1L);
+        User u2 = user(2L);
+        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1, u2)));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(u1));
+        when(userRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(u1, u2));
+        when(expenseRepository.save(any(Expense.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ExpenseResponse result = expenseService.createExpense(GROUP_ID,
+                sharesRequest("10.00", 1L, SplitType.AMOUNT,
+                        new ShareRequest(1L, new BigDecimal("3.00")),
+                        new ShareRequest(2L, new BigDecimal("7.00"))));
+
+        assertEquals(new BigDecimal("3.00"), result.splits().get(0).amount());
+        assertEquals(new BigDecimal("7.00"), result.splits().get(1).amount());
+    }
+
+    @Test
+    void shouldSplitByPercentages() {
+        User u1 = user(1L);
+        User u2 = user(2L);
+        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1, u2)));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(u1));
+        when(userRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(u1, u2));
+        when(expenseRepository.save(any(Expense.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ExpenseResponse result = expenseService.createExpense(GROUP_ID,
+                sharesRequest("10.00", 1L, SplitType.PERCENT,
+                        new ShareRequest(1L, new BigDecimal("60")),
+                        new ShareRequest(2L, new BigDecimal("40"))));
+
+        assertEquals(new BigDecimal("6.00"), result.splits().get(0).amount());
+        assertEquals(new BigDecimal("4.00"), result.splits().get(1).amount());
+    }
+
+    @Test
+    void shouldRejectAmountsThatDoNotAddUpToTotal() {
+        User u1 = user(1L);
+        User u2 = user(2L);
+        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1, u2)));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(u1));
+        when(userRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(u1, u2));
+
+        BusinessRuleException e = assertThrows(BusinessRuleException.class,
+                () -> expenseService.createExpense(GROUP_ID,
+                        sharesRequest("10.00", 1L, SplitType.AMOUNT,
+                                new ShareRequest(1L, new BigDecimal("3.00")),
+                                new ShareRequest(2L, new BigDecimal("6.00")))));
+
+        assertEquals("Amounts must add up to the total amount", e.getMessage());
+    }
+
+    @Test
+    void shouldRejectSharesForEqualSplit() {
+        User u1 = user(1L);
+        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1)));
+        CreateExpenseRequest request = new CreateExpenseRequest(new BigDecimal("10.00"),
+                ExpenseCategory.FOOD, null, 1L, SplitType.EQUAL, List.of(1L),
+                List.of(new ShareRequest(1L, new BigDecimal("10.00"))));
+
+        assertThrows(BusinessRuleException.class, () -> expenseService.createExpense(GROUP_ID, request));
+    }
+
+    @Test
+    void shouldRejectParticipantIdsForAmountSplit() {
+        User u1 = user(1L);
+        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1)));
+        CreateExpenseRequest request = new CreateExpenseRequest(new BigDecimal("10.00"),
+                ExpenseCategory.FOOD, null, 1L, SplitType.AMOUNT, List.of(1L),
+                List.of(new ShareRequest(1L, new BigDecimal("10.00"))));
+
+        assertThrows(BusinessRuleException.class, () -> expenseService.createExpense(GROUP_ID, request));
+    }
+
+    @Test
+    void shouldRejectExpenseWithoutParticipants() {
+        User u1 = user(1L);
+        when(groupRepository.findById(GROUP_ID)).thenReturn(Optional.of(group(u1)));
+
+        assertThrows(BusinessRuleException.class,
+                () -> expenseService.createExpense(GROUP_ID, request("10.00", 1L, List.of())));
     }
 }

@@ -2,6 +2,8 @@ package com.splitapp.SplitApp.service;
 
 import com.splitapp.SplitApp.dto.CreateExpenseRequest;
 import com.splitapp.SplitApp.dto.ExpenseResponse;
+import com.splitapp.SplitApp.dto.ShareRequest;
+import com.splitapp.SplitApp.dto.SplitType;
 import com.splitapp.SplitApp.entity.Expense;
 import com.splitapp.SplitApp.entity.ExpenseGroup;
 import com.splitapp.SplitApp.entity.ExpenseSplit;
@@ -41,10 +43,7 @@ public class ExpenseService {
         ExpenseGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
 
-        List<Long> participantIds = request.participantIds();
-        if (new HashSet<>(participantIds).size() != participantIds.size()) {
-            throw new BusinessRuleException("Participants must be unique");
-        }
+        List<Long> participantIds = participantIds(request);
 
         User payer = userRepository.findById(request.paidById())
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
@@ -56,22 +55,59 @@ public class ExpenseService {
             throw new UserNotFoundException("User not found");
         }
 
-        List<BigDecimal> shares;
-        try {
-            shares = SplitCalculator.splitEqually(request.amount(), participantIds.size());
-        } catch (IllegalArgumentException e) {
-            throw new BusinessRuleException(e.getMessage());
-        }
+        List<BigDecimal> amounts = calculateAmounts(request, participantIds.size());
 
         BigDecimal amount = request.amount().setScale(2, RoundingMode.UNNECESSARY);
         Expense expense = new Expense(amount, request.category(), request.description(), group, payer);
         for (int i = 0; i < participantIds.size(); i++) {
             User participant = participants.get(participantIds.get(i));
             requireMember(group, participant, "Participant is not a member of this group");
-            expense.addSplit(new ExpenseSplit(participant, shares.get(i)));
+            expense.addSplit(new ExpenseSplit(participant, amounts.get(i)));
         }
 
         return ExpenseResponse.from(expenseRepository.save(expense));
+    }
+
+    private static List<Long> participantIds(CreateExpenseRequest request) {
+        boolean hasParticipants = request.participantIds() != null && !request.participantIds().isEmpty();
+        boolean hasShares = request.shares() != null && !request.shares().isEmpty();
+
+        List<Long> ids;
+        if (request.splitType() == SplitType.EQUAL) {
+            if (hasShares) {
+                throw new BusinessRuleException("Shares are not allowed for an equal split");
+            }
+            ids = hasParticipants ? request.participantIds() : List.of();
+        } else {
+            if (hasParticipants) {
+                throw new BusinessRuleException("Participant ids are only allowed for an equal split");
+            }
+            ids = hasShares ? request.shares().stream().map(ShareRequest::userId).toList() : List.of();
+        }
+
+        if (ids.isEmpty()) {
+            throw new BusinessRuleException("At least one participant is required");
+        }
+        if (new HashSet<>(ids).size() != ids.size()) {
+            throw new BusinessRuleException("Participants must be unique");
+        }
+        return ids;
+    }
+
+    private static List<BigDecimal> calculateAmounts(CreateExpenseRequest request, int participants) {
+        try {
+            return switch (request.splitType()) {
+                case EQUAL -> SplitCalculator.splitEqually(request.amount(), participants);
+                case AMOUNT -> SplitCalculator.validateAmounts(request.amount(), shareValues(request));
+                case PERCENT -> SplitCalculator.splitByPercentages(request.amount(), shareValues(request));
+            };
+        } catch (IllegalArgumentException e) {
+            throw new BusinessRuleException(e.getMessage());
+        }
+    }
+
+    private static List<BigDecimal> shareValues(CreateExpenseRequest request) {
+        return request.shares().stream().map(ShareRequest::value).toList();
     }
 
     private static void requireMember(ExpenseGroup group, User user, String message) {
