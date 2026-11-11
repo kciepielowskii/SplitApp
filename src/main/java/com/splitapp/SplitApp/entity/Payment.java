@@ -57,8 +57,7 @@ public class Payment {
         this.receiver = Objects.requireNonNull(receiver, "Receiver is required");
         this.amount = Objects.requireNonNull(amount, "Amount is required");
 
-        if (sender == receiver
-                || (sender.getId() != null && sender.getId().equals(receiver.getId()))) {
+        if (User.sameUser(sender, receiver)) {
             throw new IllegalArgumentException("Sender and receiver must differ");
         }
         if (!group.hasMember(sender)) {
