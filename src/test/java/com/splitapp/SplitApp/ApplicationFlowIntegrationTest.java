@@ -158,30 +158,6 @@ class ApplicationFlowIntegrationTest {
     }
 
     @Test
-    void shouldReturn422WhenAddingSameMemberTwice() throws Exception {
-        TestUser owner = registerUser(uniqueEmail());
-        long groupId = createGroup(owner);
-
-        send(owner, "/groups/%d/members".formatted(groupId), """
-                {"userId":%d}
-                """.formatted(owner.id()))
-                .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.detail").value("User is already a member of this group"));
-    }
-
-    @Test
-    void shouldReturn404WhenAddingUnknownUserToGroup() throws Exception {
-        TestUser owner = registerUser(uniqueEmail());
-        long groupId = createGroup(owner);
-
-        send(owner, "/groups/%d/members".formatted(groupId), """
-                {"userId":999999}
-                """)
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.title").value("User not found"));
-    }
-
-    @Test
     void shouldReturnGroupWithAllMembers() throws Exception {
         TestUser owner = registerUser(uniqueEmail());
         TestUser friend = registerUser(uniqueEmail());
@@ -441,14 +417,14 @@ class ApplicationFlowIntegrationTest {
         TestUser outsider = registerUser(uniqueEmail());
         long groupId = createGroup(owner);
 
-        for (String path : List.of("", "/expenses", "/payments", "/balances")) {
+        for (String path : List.of("", "/expenses", "/payments", "/balances", "/invitations")) {
             fetch(outsider, "/groups/%d%s".formatted(groupId, path))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.title").value("Forbidden"));
         }
-        send(outsider, "/groups/%d/members".formatted(groupId), """
-                {"userId":%d}
-                """.formatted(outsider.id()))
+        send(outsider, "/groups/%d/invitations".formatted(groupId), """
+                {"email":"%s"}
+                """.formatted(outsider.email()))
                 .andExpect(status().isForbidden());
         send(outsider, "/groups/%d/expenses".formatted(groupId), """
                 {"amount":10.00,"category":"FOOD","paidById":%d,"participantIds":[%d]}
@@ -505,28 +481,6 @@ class ApplicationFlowIntegrationTest {
         fetch(owner, "/groups/%d/expenses".formatted(groupId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].createdById").value(friend.id()));
-    }
-
-    @Test
-    void shouldReturn403WhenRegularMemberAddsMemberButOwnerCan() throws Exception {
-        TestUser owner = registerUser(uniqueEmail());
-        TestUser friend = registerUser(uniqueEmail());
-        TestUser newcomer = registerUser(uniqueEmail());
-        long groupId = createGroup(owner);
-        addMember(groupId, owner, friend);
-
-        send(friend, "/groups/%d/members".formatted(groupId), """
-                {"userId":%d}
-                """.formatted(newcomer.id()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.title").value("Forbidden"))
-                .andExpect(jsonPath("$.detail").value("Only the group owner can add members"));
-
-        fetch(newcomer, "/groups/%d".formatted(groupId)).andExpect(status().isForbidden());
-
-        addMember(groupId, owner, newcomer);
-
-        fetch(newcomer, "/groups/%d".formatted(groupId)).andExpect(status().isOk());
     }
 
     @Test
@@ -632,6 +586,137 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void shouldJoinGroupAfterAcceptingInvitation() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+
+        // the address is matched case-insensitively
+        long invitationId = invite(groupId, owner, friend.email().toUpperCase());
+
+        // before accepting, the invitee sees only the group name and who invited them
+        fetch(friend, "/invitations")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(invitationId))
+                .andExpect(jsonPath("$[0].groupName").value("Wyjazd"))
+                .andExpect(jsonPath("$[0].members").doesNotExist());
+        fetch(friend, "/groups/%d".formatted(groupId)).andExpect(status().isForbidden());
+
+        send(friend, "/invitations/%d/accept".formatted(invitationId), "")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(groupId))
+                .andExpect(jsonPath("$.members.length()").value(2))
+                .andExpect(jsonPath("$.members[1].userId").value(friend.id()))
+                .andExpect(jsonPath("$.members[1].role").value("MEMBER"));
+
+        fetch(friend, "/groups/%d".formatted(groupId)).andExpect(status().isOk());
+        fetch(friend, "/invitations")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void shouldLetOnlyTheInvitedPersonAnswerAnInvitation() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        TestUser stranger = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        long invitationId = invite(groupId, owner, friend.email());
+        String accept = "/invitations/%d/accept".formatted(invitationId);
+
+        send(stranger, accept, "")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Invitation not found"));
+        send(owner, accept, "").andExpect(status().isNotFound());
+        fetch(stranger, "/invitations")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        fetch(stranger, "/groups/%d".formatted(groupId)).andExpect(status().isForbidden());
+
+        send(friend, "/invitations/%d/decline".formatted(invitationId), "")
+                .andExpect(status().isNoContent());
+        send(friend, accept, "").andExpect(status().isNotFound());
+        fetch(owner, "/groups/%d/invitations".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        // a declined invitation does not block inviting the same person again
+        invite(groupId, owner, friend.email());
+    }
+
+    @Test
+    void shouldAllowOnlyTheOwnerToInviteAndManageInvitations() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        TestUser outsider = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        String invitationsUrl = "/groups/%d/invitations".formatted(groupId);
+        String newcomerEmail = uniqueEmail();
+
+        send(friend, invitationsUrl, """
+                {"email":"%s"}
+                """.formatted(newcomerEmail))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("Only the group owner can invite members"));
+        send(outsider, invitationsUrl, """
+                {"email":"%s"}
+                """.formatted(newcomerEmail))
+                .andExpect(status().isForbidden());
+        fetch(friend, invitationsUrl).andExpect(status().isForbidden());
+
+        long invitationId = invite(groupId, owner, newcomerEmail);
+        send(owner, invitationsUrl, """
+                {"email":"%s"}
+                """.formatted(newcomerEmail))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail")
+                        .value("This e-mail already has a pending invitation"));
+        send(owner, invitationsUrl, """
+                {"email":"%s"}
+                """.formatted(friend.email()))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value("User is already a member of this group"));
+
+        fetch(owner, invitationsUrl)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].email").value(newcomerEmail));
+
+        String cancelUrl = "%s/%d".formatted(invitationsUrl, invitationId);
+        remove(friend, cancelUrl).andExpect(status().isForbidden());
+        remove(owner, cancelUrl).andExpect(status().isNoContent());
+        remove(owner, cancelUrl)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Invitation not found"));
+        fetch(owner, invitationsUrl)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void shouldLetSomeoneWhoRegistersLaterAcceptAnInvitation() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        String lateEmail = uniqueEmail();
+
+        // the invitation succeeds although nobody has registered with this address yet
+        invite(groupId, owner, lateEmail);
+
+        TestUser late = registerUser(lateEmail);
+        MvcResult pending = fetch(late, "/invitations")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andReturn();
+        Number invitationId = JsonPath.read(pending.getResponse().getContentAsString(), "$[0].id");
+
+        send(late, "/invitations/%d/accept".formatted(invitationId.longValue()), "")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members.length()").value(2));
+    }
+
     private record TestUser(long id, String email) {
     }
 
@@ -679,11 +764,10 @@ class ApplicationFlowIntegrationTest {
                 .andReturn());
     }
 
-    private void addMember(long groupId, TestUser actor, TestUser newMember) throws Exception {
-        send(actor, "/groups/%d/members".formatted(groupId), """
-                {"userId":%d}
-                """.formatted(newMember.id()))
-                .andExpect(status().isCreated());
+    private void addMember(long groupId, TestUser owner, TestUser newMember) throws Exception {
+        long invitationId = invite(groupId, owner, newMember.email());
+        send(newMember, "/invitations/%d/accept".formatted(invitationId), "")
+                .andExpect(status().isOk());
     }
 
     private long createExpense(long groupId, TestUser payer, String amount) throws Exception {
@@ -708,6 +792,14 @@ class ApplicationFlowIntegrationTest {
         return idOf(send(sender, "/groups/%d/payments".formatted(groupId), """
                 {"senderId":%d,"receiverId":%d,"amount":%s}
                 """.formatted(sender.id(), receiver.id(), amount))
+                .andExpect(status().isCreated())
+                .andReturn());
+    }
+
+    private long invite(long groupId, TestUser owner, String email) throws Exception {
+        return idOf(send(owner, "/groups/%d/invitations".formatted(groupId), """
+                {"email":"%s"}
+                """.formatted(email))
                 .andExpect(status().isCreated())
                 .andReturn());
     }
