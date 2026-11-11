@@ -73,4 +73,80 @@ class SplitCalculatorTest {
             }
         }
     }
+
+    @Test
+    void shouldSplitByPercentages() {
+        List<BigDecimal> parts = SplitCalculator.splitByPercentages(
+                new BigDecimal("100.00"), List.of(new BigDecimal("70"), new BigDecimal("30")));
+
+        assertEquals(List.of(new BigDecimal("70.00"), new BigDecimal("30.00")), parts);
+    }
+
+    @Test
+    void shouldGiveLeftoverCentToLargestFractionalPart() {
+        List<BigDecimal> parts = SplitCalculator.splitByPercentages(new BigDecimal("10.00"),
+                List.of(new BigDecimal("33.33"), new BigDecimal("33.33"), new BigDecimal("33.34")));
+
+        assertEquals(List.of(new BigDecimal("3.33"), new BigDecimal("3.33"), new BigDecimal("3.34")), parts);
+    }
+
+    @Test
+    void shouldGiveLeftoverCentToFirstOnTie() {
+        List<BigDecimal> parts = SplitCalculator.splitByPercentages(
+                new BigDecimal("0.05"), List.of(new BigDecimal("50"), new BigDecimal("50")));
+
+        assertEquals(List.of(new BigDecimal("0.03"), new BigDecimal("0.02")), parts);
+    }
+
+    @Test
+    void shouldRejectPercentagesNotAddingUpTo100() {
+        assertThrows(IllegalArgumentException.class, () -> SplitCalculator.splitByPercentages(
+                new BigDecimal("10.00"), List.of(new BigDecimal("50"), new BigDecimal("40"))));
+    }
+
+    @Test
+    void shouldRejectZeroPercentage() {
+        assertThrows(IllegalArgumentException.class, () -> SplitCalculator.splitByPercentages(
+                new BigDecimal("10.00"), List.of(new BigDecimal("100"), BigDecimal.ZERO)));
+    }
+
+    @Test
+    void shouldRejectPercentageSplitThatLeavesSomeoneWithNothing() {
+        assertThrows(IllegalArgumentException.class, () -> SplitCalculator.splitByPercentages(
+                new BigDecimal("0.01"), List.of(new BigDecimal("50"), new BigDecimal("50"))));
+    }
+
+    @Test
+    void shouldAlwaysSumToTheTotalWhenSplittingByPercentages() {
+        List<BigDecimal> percentages =
+                List.of(new BigDecimal("33.33"), new BigDecimal("33.33"), new BigDecimal("33.34"));
+        for (String amount : List.of("0.07", "1.00", "9.99", "100.01", "12345.67")) {
+            BigDecimal total = new BigDecimal(amount);
+
+            BigDecimal sum = SplitCalculator.splitByPercentages(total, percentages).stream()
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            assertEquals(total, sum, amount);
+        }
+    }
+
+    @Test
+    void shouldAcceptAmountsAddingUpToTheTotalAndNormalizeScale() {
+        List<BigDecimal> amounts = SplitCalculator.validateAmounts(
+                new BigDecimal("10.00"), List.of(new BigDecimal("3"), new BigDecimal("7.00")));
+
+        assertEquals(List.of(new BigDecimal("3.00"), new BigDecimal("7.00")), amounts);
+    }
+
+    @Test
+    void shouldRejectAmountsNotAddingUpToTheTotal() {
+        assertThrows(IllegalArgumentException.class, () -> SplitCalculator.validateAmounts(
+                new BigDecimal("10.00"), List.of(new BigDecimal("3.00"), new BigDecimal("6.00"))));
+    }
+
+    @Test
+    void shouldRejectNonPositiveAmountInExplicitSplit() {
+        assertThrows(IllegalArgumentException.class, () -> SplitCalculator.validateAmounts(
+                new BigDecimal("10.00"), List.of(new BigDecimal("10.00"), BigDecimal.ZERO)));
+    }
 }
