@@ -14,11 +14,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -100,5 +102,27 @@ class PaymentControllerTest {
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.title").value("Business rule violation"))
                 .andExpect(jsonPath("$.detail").value("Sender and receiver must differ"));
+    }
+
+    @Test
+    void shouldReturnGroupPayments() throws Exception {
+        PaymentResponse response = new PaymentResponse(7L, 1L, 1L, 2L,
+                new BigDecimal("10.00"), Instant.parse("2026-11-11T12:00:00Z"));
+        when(paymentService.getPayments(1L)).thenReturn(List.of(response));
+
+        mockMvc.perform(get("/groups/1/payments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].senderId").value(1))
+                .andExpect(jsonPath("$[0].receiverId").value(2));
+    }
+
+    @Test
+    void shouldReturn404WhenListingPaymentsOfUnknownGroup() throws Exception {
+        when(paymentService.getPayments(99L)).thenThrow(new GroupNotFoundException("Group not found"));
+
+        mockMvc.perform(get("/groups/99/payments"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
     }
 }

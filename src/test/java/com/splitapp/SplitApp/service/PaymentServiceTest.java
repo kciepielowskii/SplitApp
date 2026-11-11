@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -142,5 +143,30 @@ class PaymentServiceTest {
         }
         ReflectionTestUtils.setField(group, "id", GROUP_ID);
         return group;
+    }
+
+    @Test
+    void shouldReturnGroupPayments() {
+        User u1 = user(1L);
+        User u2 = user(2L);
+        Payment payment = new Payment(group(u1, u2), u1, u2, new BigDecimal("10.00"));
+        when(groupRepository.existsById(GROUP_ID)).thenReturn(true);
+        when(paymentRepository.findAllByGroupIdOrderByPaidAtDescIdDesc(GROUP_ID))
+                .thenReturn(List.of(payment));
+
+        List<PaymentResponse> result = paymentService.getPayments(GROUP_ID);
+
+        assertEquals(1, result.size());
+        assertEquals(1L, result.get(0).senderId());
+        assertEquals(2L, result.get(0).receiverId());
+    }
+
+    @Test
+    void shouldThrowWhenListingPaymentsOfUnknownGroup() {
+        when(groupRepository.existsById(GROUP_ID)).thenReturn(false);
+
+        assertThrows(GroupNotFoundException.class, () -> paymentService.getPayments(GROUP_ID));
+
+        verify(paymentRepository, never()).findAllByGroupIdOrderByPaidAtDescIdDesc(any());
     }
 }

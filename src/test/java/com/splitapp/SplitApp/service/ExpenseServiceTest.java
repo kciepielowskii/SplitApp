@@ -6,6 +6,7 @@ import com.splitapp.SplitApp.dto.ExpenseSplitResponse;
 import com.splitapp.SplitApp.entity.Expense;
 import com.splitapp.SplitApp.entity.ExpenseCategory;
 import com.splitapp.SplitApp.entity.ExpenseGroup;
+import com.splitapp.SplitApp.entity.ExpenseSplit;
 import com.splitapp.SplitApp.entity.GroupRole;
 import com.splitapp.SplitApp.entity.User;
 import com.splitapp.SplitApp.exception.BusinessRuleException;
@@ -179,5 +180,31 @@ class ExpenseServiceTest {
 
         assertThrows(UserNotFoundException.class,
                 () -> expenseService.createExpense(GROUP_ID, request("0.01", 1L, List.of(1L, 2L))));
+    }
+
+    @Test
+    void shouldReturnGroupExpenses() {
+        User u1 = user(1L);
+        ExpenseGroup group = group(u1);
+        Expense expense = new Expense(new BigDecimal("10.00"), ExpenseCategory.FOOD, "Obiad", group, u1);
+        expense.addSplit(new ExpenseSplit(u1, new BigDecimal("10.00")));
+        when(groupRepository.existsById(GROUP_ID)).thenReturn(true);
+        when(expenseRepository.findAllByGroupIdOrderByCreatedAtDescIdDesc(GROUP_ID))
+                .thenReturn(List.of(expense));
+
+        List<ExpenseResponse> result = expenseService.getExpenses(GROUP_ID);
+
+        assertEquals(1, result.size());
+        assertEquals(1L, result.get(0).paidById());
+        assertEquals(1, result.get(0).splits().size());
+    }
+
+    @Test
+    void shouldThrowWhenListingExpensesOfUnknownGroup() {
+        when(groupRepository.existsById(GROUP_ID)).thenReturn(false);
+
+        assertThrows(GroupNotFoundException.class, () -> expenseService.getExpenses(GROUP_ID));
+
+        verify(expenseRepository, never()).findAllByGroupIdOrderByCreatedAtDescIdDesc(any());
     }
 }

@@ -20,6 +20,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 
 @Service
 @Validated
@@ -55,5 +56,15 @@ public class PaymentService {
         if (!group.hasMember(user)) {
             throw new BusinessRuleException(message);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentResponse> getPayments(@NotNull Long groupId) {
+        if (!groupRepository.existsById(groupId)) {
+            throw new GroupNotFoundException("Group not found");
+        }
+        return paymentRepository.findAllByGroupIdOrderByPaidAtDescIdDesc(groupId).stream()
+                .map(PaymentResponse::from)
+                .toList();
     }
 }

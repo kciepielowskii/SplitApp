@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @WebMvcTest(ExpenseController.class)
 class ExpenseControllerTest {
@@ -137,5 +138,28 @@ class ExpenseControllerTest {
                 .andExpect(jsonPath("$.errors.participantIds").exists());
 
         verifyNoInteractions(expenseService);
+    }
+
+    @Test
+    void shouldReturnGroupExpenses() throws Exception {
+        ExpenseResponse response = new ExpenseResponse(5L, 1L, new BigDecimal("10.00"),
+                ExpenseCategory.FOOD, "Obiad", 1L,
+                List.of(new ExpenseSplitResponse(1L, new BigDecimal("10.00"))));
+        when(expenseService.getExpenses(1L)).thenReturn(List.of(response));
+
+        mockMvc.perform(get("/groups/1/expenses"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(5))
+                .andExpect(jsonPath("$[0].splits[0].userId").value(1));
+    }
+
+    @Test
+    void shouldReturn404WhenListingExpensesOfUnknownGroup() throws Exception {
+        when(expenseService.getExpenses(99L)).thenThrow(new GroupNotFoundException("Group not found"));
+
+        mockMvc.perform(get("/groups/99/expenses"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
     }
 }

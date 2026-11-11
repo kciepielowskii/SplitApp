@@ -12,10 +12,10 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.UUID;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -201,6 +201,69 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.title").value("User not found"));
     }
 
+    @Test
+    void shouldReturnGroupWithAllMembers() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long friendId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+        addMember(groupId, friendId);
+
+        mockMvc.perform(get("/groups/%d".formatted(groupId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(groupId))
+                .andExpect(jsonPath("$.members.length()").value(2))
+                .andExpect(jsonPath("$.members[0].userId").value(ownerId))
+                .andExpect(jsonPath("$.members[1].userId").value(friendId));
+    }
+
+    @Test
+    void shouldReturn404WhenGettingUnknownGroup() throws Exception {
+        mockMvc.perform(get("/groups/999999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
+    @Test
+    void shouldListExpensesNewestFirst() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+        createExpense(groupId, ownerId, "10.00");
+        createExpense(groupId, ownerId, "20.00");
+
+        mockMvc.perform(get("/groups/%d/expenses".formatted(groupId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].amount").value(20.0))
+                .andExpect(jsonPath("$[1].amount").value(10.0))
+                .andExpect(jsonPath("$[0].splits[0].userId").value(ownerId));
+    }
+
+    @Test
+    void shouldListPaymentsNewestFirst() throws Exception {
+        long ownerId = registerUser(uniqueEmail());
+        long friendId = registerUser(uniqueEmail());
+        long groupId = createGroup(ownerId);
+        addMember(groupId, friendId);
+        createPayment(groupId, friendId, ownerId, "5.00");
+        createPayment(groupId, ownerId, friendId, "7.00");
+
+        mockMvc.perform(get("/groups/%d/payments".formatted(groupId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].amount").value(7.0))
+                .andExpect(jsonPath("$[1].amount").value(5.0));
+    }
+
+    @Test
+    void shouldReturn404WhenListingExpensesAndPaymentsOfUnknownGroup() throws Exception {
+        mockMvc.perform(get("/groups/999999/expenses"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
+        mockMvc.perform(get("/groups/999999/payments"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Group not found"));
+    }
+
     private long registerUser(String email) throws Exception {
         MvcResult result = mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -236,6 +299,24 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(status().isCreated());
     }
 
+    private void createExpense(long groupId, long userId, String amount) throws Exception {
+        mockMvc.perform(post("/groups/%d/expenses".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":%s,"category":"FOOD","paidById":%d,"participantIds":[%d]}
+                                """.formatted(amount, userId, userId)))
+                .andExpect(status().isCreated());
+    }
+
+    private void createPayment(long groupId, long senderId, long receiverId, String amount) throws Exception {
+        mockMvc.perform(post("/groups/%d/payments".formatted(groupId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"senderId":%d,"receiverId":%d,"amount":%s}
+                                """.formatted(senderId, receiverId, amount)))
+                .andExpect(status().isCreated());
+    }
+
     private static String registerBody(String email) {
         return """
                 {"firstName":"Jan","lastName":"Kowalski","email":"%s","password":"secret123"}
@@ -245,27 +326,5 @@ class ApplicationFlowIntegrationTest {
     // the database is shared between tests in this class and is not rolled back
     private static String uniqueEmail() {
         return "e2e-" + UUID.randomUUID() + "@example.com";
-    }
-
-    @Test
-    void shouldReturnGroupWithAllMembers() throws Exception {
-        long ownerId = registerUser(uniqueEmail());
-        long friendId = registerUser(uniqueEmail());
-        long groupId = createGroup(ownerId);
-        addMember(groupId, friendId);
-
-        mockMvc.perform(get("/groups/%d".formatted(groupId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(groupId))
-                .andExpect(jsonPath("$.members.length()").value(2))
-                .andExpect(jsonPath("$.members[0].userId").value(ownerId))
-                .andExpect(jsonPath("$.members[1].userId").value(friendId));
-    }
-
-    @Test
-    void shouldReturn404WhenGettingUnknownGroup() throws Exception {
-        mockMvc.perform(get("/groups/999999"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.title").value("Group not found"));
     }
 }
