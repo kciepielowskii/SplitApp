@@ -52,7 +52,7 @@ class ExpenseControllerTest {
     @Test
     void shouldCreateExpense() throws Exception {
         ExpenseResponse response = new ExpenseResponse(5L, 1L, new BigDecimal("10.00"),
-                ExpenseCategory.FOOD, "Obiad", 1L,
+                ExpenseCategory.FOOD, "Obiad", 1L, 1L,
                 List.of(new ExpenseSplitResponse(1L, new BigDecimal("5.00")),
                         new ExpenseSplitResponse(2L, new BigDecimal("5.00"))));
         when(expenseService.createExpense(eq(1L), eq(1L), any(CreateExpenseRequest.class)))
@@ -152,7 +152,7 @@ class ExpenseControllerTest {
     @Test
     void shouldReturnGroupExpenses() throws Exception {
         ExpenseResponse response = new ExpenseResponse(5L, 1L, new BigDecimal("10.00"),
-                ExpenseCategory.FOOD, "Obiad", 1L,
+                ExpenseCategory.FOOD, "Obiad", 1L, 1L,
                 List.of(new ExpenseSplitResponse(1L, new BigDecimal("10.00"))));
         when(expenseService.getExpenses(1L, 1L)).thenReturn(List.of(response));
 
@@ -160,6 +160,7 @@ class ExpenseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(5))
+                .andExpect(jsonPath("$[0].createdById").value(1))
                 .andExpect(jsonPath("$[0].splits[0].userId").value(1));
     }
 

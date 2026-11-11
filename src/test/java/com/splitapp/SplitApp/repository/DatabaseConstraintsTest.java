@@ -91,7 +91,7 @@ class DatabaseConstraintsTest {
     void shouldRejectTwoSplitsForSameUserInOneExpense() {
         User user = saveUser("payer@example.com");
         ExpenseGroup group = saveGroup(user);
-        Expense expense = new Expense(TEN, category, "Obiad", group, user);
+        Expense expense = new Expense(TEN, category, "Obiad", group, user, user);
         expense.addSplit(new ExpenseSplit(user, new BigDecimal("5.00")));
         expenseRepository.saveAndFlush(expense);
 
@@ -109,14 +109,14 @@ class DatabaseConstraintsTest {
 
         assertThrows(DataIntegrityViolationException.class,
                 () -> expenseRepository.saveAndFlush(
-                        new Expense(BigDecimal.ZERO, category, "Obiad", group, user)));
+                        new Expense(BigDecimal.ZERO, category, "Obiad", group, user, user)));
     }
 
     @Test
     void shouldRejectNonPositiveSplitAmount() {
         User user = saveUser("payer@example.com");
         ExpenseGroup group = saveGroup(user);
-        Expense expense = new Expense(TEN, category, "Obiad", group, user);
+        Expense expense = new Expense(TEN, category, "Obiad", group, user, user);
         expense.addSplit(new ExpenseSplit(user, BigDecimal.ZERO));
 
         assertThrows(DataIntegrityViolationException.class,
@@ -132,7 +132,7 @@ class DatabaseConstraintsTest {
 
         assertThrows(DataIntegrityViolationException.class,
                 () -> paymentRepository.saveAndFlush(
-                        new Payment(group, sender, receiver, BigDecimal.ZERO)));
+                        new Payment(group, sender, receiver, BigDecimal.ZERO, sender)));
     }
 
     @Test
@@ -141,7 +141,7 @@ class DatabaseConstraintsTest {
         User receiver = saveUser("receiver@example.com");
         ExpenseGroup group = saveGroup(sender);
         group.addMember(receiver, GroupRole.MEMBER);
-        Payment payment = new Payment(group, sender, receiver, TEN);
+        Payment payment = new Payment(group, sender, receiver, TEN, sender);
         // the constructor refuses sender == receiver, so bypass it to test the DB check
         ReflectionTestUtils.setField(payment, "receiver", sender);
 
@@ -165,7 +165,7 @@ class DatabaseConstraintsTest {
         User user = saveUser("payer@example.com");
         ExpenseGroup group = saveGroup(user);
         Expense expense = expenseRepository.saveAndFlush(
-                new Expense(TEN, category, "Obiad", group, user));
+                new Expense(TEN, category, "Obiad", group, user, user));
 
         assertThrows(DataIntegrityViolationException.class,
                 () -> jdbcTemplate.update(

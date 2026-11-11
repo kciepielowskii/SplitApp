@@ -61,6 +61,10 @@ public class Expense {
     @JoinColumn(name = "paid_by_id", nullable = false)
     private User paidBy;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "created_by_id", nullable = false, updatable = false)
+    private User createdBy;
+
     @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id")
     private List<ExpenseSplit> splits = new ArrayList<>();
@@ -74,12 +78,13 @@ public class Expense {
     }
 
     public Expense(BigDecimal amount, ExpenseCategory category, String description,
-                   ExpenseGroup group, User paidBy) {
+                   ExpenseGroup group, User paidBy, User createdBy) {
         this.amount = Objects.requireNonNull(amount, "Amount is required");
         this.category = Objects.requireNonNull(category, "Category is required");
         this.description = description;
         this.group = Objects.requireNonNull(group, "Group is required");
         this.paidBy = Objects.requireNonNull(paidBy, "Payer is required");
+        this.createdBy = Objects.requireNonNull(createdBy, "Author is required");
 
         if (!group.hasMember(paidBy)) {
             throw new IllegalArgumentException("Payer is not a member of this group");

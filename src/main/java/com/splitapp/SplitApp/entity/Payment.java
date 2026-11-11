@@ -42,6 +42,10 @@ public class Payment {
     @JoinColumn(name = "receiver_id", nullable = false)
     private User receiver;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "created_by_id", nullable = false, updatable = false)
+    private User createdBy;
+
     @NotNull(message = "The amount is required")
     @DecimalMin(value = "0.01", message = "Amount must be greater than zero")
     @Digits(integer = 8, fraction = 2)
@@ -51,11 +55,13 @@ public class Payment {
     @Column(nullable = false, updatable = false)
     private Instant paidAt;
 
-    public Payment(ExpenseGroup group, User sender, User receiver, BigDecimal amount) {
+    public Payment(ExpenseGroup group, User sender, User receiver, BigDecimal amount,
+                   User createdBy) {
         this.group = Objects.requireNonNull(group, "Group is required");
         this.sender = Objects.requireNonNull(sender, "Sender is required");
         this.receiver = Objects.requireNonNull(receiver, "Receiver is required");
         this.amount = Objects.requireNonNull(amount, "Amount is required");
+        this.createdBy = Objects.requireNonNull(createdBy, "Author is required");
 
         if (User.sameUser(sender, receiver)) {
             throw new IllegalArgumentException("Sender and receiver must differ");

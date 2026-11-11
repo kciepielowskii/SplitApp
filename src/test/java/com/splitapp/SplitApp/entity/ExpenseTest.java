@@ -26,30 +26,36 @@ class ExpenseTest {
     @Test
     void shouldRejectNullAmount() {
         assertThrows(NullPointerException.class,
-                () -> new Expense(null, category, "Obiad", group, paidBy));
+                () -> new Expense(null, category, "Obiad", group, paidBy, paidBy));
     }
 
     @Test
     void shouldRejectNullCategory() {
         assertThrows(NullPointerException.class,
-                () -> new Expense(BigDecimal.TEN, null, "Obiad", group, paidBy));
+                () -> new Expense(BigDecimal.TEN, null, "Obiad", group, paidBy, paidBy));
     }
 
     @Test
     void shouldRejectNullGroup() {
         assertThrows(NullPointerException.class,
-                () -> new Expense(BigDecimal.TEN, category, "Obiad", null, paidBy));
+                () -> new Expense(BigDecimal.TEN, category, "Obiad", null, paidBy, paidBy));
     }
 
     @Test
     void shouldRejectNullPayer() {
         assertThrows(NullPointerException.class,
-                () -> new Expense(BigDecimal.TEN, category, "Obiad", group, null));
+                () -> new Expense(BigDecimal.TEN, category, "Obiad", group, null, paidBy));
+    }
+
+    @Test
+    void shouldRejectNullAuthor() {
+        assertThrows(NullPointerException.class,
+                () -> new Expense(BigDecimal.TEN, category, "Obiad", group, paidBy, null));
     }
 
     @Test
     void shouldAllowNullDescription() {
-        assertDoesNotThrow(() -> new Expense(BigDecimal.TEN, category, null, group, paidBy));
+        assertDoesNotThrow(() -> new Expense(BigDecimal.TEN, category, null, group, paidBy, paidBy));
     }
 
     @Test
@@ -66,7 +72,7 @@ class ExpenseTest {
     }
 
     private Expense expense() {
-        return new Expense(BigDecimal.TEN, category, "Obiad", group, paidBy);
+        return new Expense(BigDecimal.TEN, category, "Obiad", group, paidBy, paidBy);
     }
 
     @Test

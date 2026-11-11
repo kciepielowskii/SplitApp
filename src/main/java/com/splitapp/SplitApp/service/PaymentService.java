@@ -58,7 +58,8 @@ public class PaymentService {
         requireMember(group, receiver, "Receiver is not a member of this group");
 
         BigDecimal amount = request.amount().setScale(2, RoundingMode.UNNECESSARY);
-        Payment payment = new Payment(group, sender, receiver, amount);
+        User createdBy = currentUserId.equals(sender.getId()) ? sender : receiver;
+        Payment payment = new Payment(group, sender, receiver, amount, createdBy);
         return PaymentResponse.from(paymentRepository.save(payment));
     }
 
