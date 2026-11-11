@@ -82,7 +82,9 @@ class GroupControllerTest {
                         .content("""
                                 {"groupName":"Wyjazd","userId":99}
                                 """))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("User not found"))
+                .andExpect(jsonPath("$.detail").value("User not found"));
     }
 
     @Test
