@@ -248,6 +248,11 @@ account until the receiver confirms them.
 - **Migrations assume data created by the application.** For example, V10 normalises emails
   and would stop on two addresses that differ only in letter case.
 - **`lock_timeout` is 5 seconds for every connection**, also the one Flyway uses.
+- **ASCII-only emails.** Email addresses may contain only ASCII characters. Java and
+  PostgreSQL can disagree on the lower-case form of newer Unicode letters, which would
+  break the rule that stored emails are lower-case.
+- **Very large balances.** A suggested transfer can be bigger than the largest payment the
+  API accepts (99,999,999.99) when a balance is that big; it then takes several payments.
 - **Updates.** The PostgreSQL image is pinned to an exact version and is updated by hand,
   together with the Testcontainers image. The project targets Java 17.
 

@@ -16,3 +16,6 @@ updates:
     target-branch: develop
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
