@@ -4,25 +4,29 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.TypeMismatchException;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
-import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
-import org.springframework.dao.ConcurrencyFailureException;
-import org.springframework.beans.TypeMismatchException;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.sql.SQLException;
+import java.util.SortedSet;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 @Slf4j
 @RestControllerAdvice
@@ -37,13 +41,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException exception, HttpHeaders headers,
             HttpStatusCode status, WebRequest request) {
-        Map<String, String> errors = new LinkedHashMap<>();
+        Map<String, SortedSet<String>> messages = new TreeMap<>();
         exception.getBindingResult().getFieldErrors().forEach(error ->
-                errors.putIfAbsent(error.getField(), error.getDefaultMessage()));
+                addMessage(messages, error.getField(), error.getDefaultMessage()));
         exception.getBindingResult().getGlobalErrors().forEach(error ->
-                errors.putIfAbsent("_global", error.getDefaultMessage()));
+                addMessage(messages, "_global", error.getDefaultMessage()));
 
-        return handleExceptionInternal(exception, validationProblem(errors), headers, status, request);
+        return handleExceptionInternal(exception, validationProblem(joined(messages)), headers,
+                status, request);
     }
 
     @Override
@@ -73,11 +78,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ProblemDetail handleConstraintViolation(ConstraintViolationException exception) {
-        Map<String, String> errors = new LinkedHashMap<>();
+        Map<String, SortedSet<String>> messages = new TreeMap<>();
         exception.getConstraintViolations().forEach(violation ->
-                errors.putIfAbsent(fieldName(violation), violation.getMessage()));
+                addMessage(messages, fieldName(violation), violation.getMessage()));
 
-        return validationProblem(errors);
+        return validationProblem(joined(messages));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -116,7 +121,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception exception) {
-        log.error("Unexpected error", exception);
+        if (exception instanceof DataAccessException) {
+            // the message of a database exception contains the SQL and the values in it
+            log.error("Unexpected database error: {}, SQLState: {}",
+                    exception.getClass().getName(), sqlStateOf(exception));
+        } else {
+            log.error("Unexpected error", exception);
+        }
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",
                 "An unexpected error occurred.");
     }
@@ -178,6 +189,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             name = node.getName();
         }
         return name;
+    }
+
+    private static void addMessage(Map<String, SortedSet<String>> messages, String field,
+                                   String message) {
+        messages.computeIfAbsent(field, key -> new TreeSet<>())
+                .add(message == null ? "Invalid value" : message);
+    }
+
+    // Every violation of a field is reported, in alphabetical order, so the same request
+    // always gets the same answer.
+    private static Map<String, String> joined(Map<String, SortedSet<String>> messages) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        messages.forEach((field, texts) -> errors.put(field, String.join("; ", texts)));
+        return errors;
     }
 
     // The SQLState lives on the driver's SQLException at the bottom of the cause chain, whatever

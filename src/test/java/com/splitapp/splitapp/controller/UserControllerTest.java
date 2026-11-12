@@ -3,10 +3,10 @@ package com.splitapp.splitapp.controller;
 import com.splitapp.splitapp.dto.RegisterUserRequest;
 import com.splitapp.splitapp.dto.UserResponse;
 import com.splitapp.splitapp.exception.EmailAlreadyUsedException;
-import com.splitapp.splitapp.security.SecurityConfig;
-import com.splitapp.splitapp.service.UserService;
 import com.splitapp.splitapp.exception.UserNotFoundException;
+import com.splitapp.splitapp.security.SecurityConfig;
 import com.splitapp.splitapp.security.WithMockAppUser;
+import com.splitapp.splitapp.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -17,11 +17,10 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -67,6 +66,18 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.errors.password").exists());
 
         verifyNoInteractions(userService);
+    }
+
+    @Test
+    void shouldReportEveryViolationOfAFieldInOneMessage() throws Exception {
+        mockMvc.perform(post("/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"firstName":"Jan","lastName":"Kowalski","email":"jan@example.com","password":"   "}
+                            """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.password")
+                        .value(org.hamcrest.Matchers.containsString("; ")));
     }
 
     @Test

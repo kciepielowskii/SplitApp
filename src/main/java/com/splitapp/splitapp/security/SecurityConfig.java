@@ -23,6 +23,9 @@ public class SecurityConfig {
                 // that accept form data.
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // the API is stateless, so there is nothing to log out of; without this Spring
+                // Security answers GET/POST /logout with a redirect to a login page
+                .logout(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()
                         .anyRequest().authenticated())
