@@ -1187,6 +1187,20 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void shouldDescribeAnEmptyJsonBodyForPostsWithoutOne() throws Exception {
+        // every POST needs the JSON content type, and Swagger UI sends it only for an
+        // operation that describes a request body
+        String body = ".post.requestBody.content['application/json']";
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/invitations/{invitationId}/accept']" + body).exists())
+                .andExpect(jsonPath("$.paths['/invitations/{invitationId}/decline']" + body).exists())
+                .andExpect(jsonPath("$.paths['/groups/{groupId}/payments/{paymentId}/confirm']" + body)
+                        .exists())
+                .andExpect(jsonPath("$.paths['/groups/{groupId}/leave']" + body).exists());
+    }
+
     private record TestUser(long id, String email) {
     }
 
