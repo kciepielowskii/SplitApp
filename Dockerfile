@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM eclipse-temurin:17-jdk AS build
+FROM eclipse-temurin:24-jdk AS build
 # without unzip the Maven wrapper downloads the .tar.gz distribution, whose checksum is not
 # the one in maven-wrapper.properties (that is the checksum of the .zip)
 RUN apt-get update \
@@ -12,7 +12,7 @@ COPY mvnw pom.xml ./
 COPY src src
 RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -DskipTests package
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:24-jre
 RUN useradd --system --uid 10001 --no-create-home app
 WORKDIR /app
 COPY --from=build --chown=app:app /app/target/*.jar app.jar
