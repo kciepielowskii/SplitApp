@@ -995,41 +995,46 @@ class ApplicationFlowIntegrationTest {
     }
 
     @Test
-    void shouldNotLetAMemberLeaveAndBeChargedAtTheSameTime() throws Exception {
+    void shouldNotChargeAMemberWhoLeftFirst() throws Exception {
         TestUser owner = registerUser(uniqueEmail());
         TestUser friend = registerUser(uniqueEmail());
         long groupId = createGroup(owner);
         addMember(groupId, owner, friend);
 
-        List<Integer> statuses = runAtTheSameTime(List.of(
+        // the friend's leaving reaches the database first, the expense queues up behind it
+        List<Integer> statuses = runBehindRowLock(memberRowLock(groupId, friend), List.of(
                 () -> statusOfPost(friend, "/groups/%d/leave".formatted(groupId), ""),
                 () -> statusOfPost(owner, "/groups/%d/expenses".formatted(groupId), """
                         {"amount":10.00,"category":"FOOD","paidById":%d,"participantIds":[%d,%d]}
                         """.formatted(owner.id(), owner.id(), friend.id()))));
 
-        // either the expense comes first and the friend must settle up, or the friend
-        // leaves first and cannot be a participant; never both
-        assertEquals(1, statuses.stream()
-                .filter(status -> status == 204 || status == 201).count());
+        // the expense finds out that the friend is no longer a member
+        assertEquals(List.of(204, 422), statuses);
+        assertEquals(403, statusOfGet(friend, "/groups/%d".formatted(groupId)));
+        fetch(owner, "/groups/%d/expenses".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
-    void shouldNeverLeaveAGroupWithoutAnOwner() throws Exception {
+    void shouldNotLetTheNewOwnerLeaveWhileOwnershipIsBeingTransferred() throws Exception {
         TestUser owner = registerUser(uniqueEmail());
         TestUser friend = registerUser(uniqueEmail());
         long groupId = createGroup(owner);
         addMember(groupId, owner, friend);
 
-        List<Integer> statuses = runAtTheSameTime(List.of(
+        // the transfer reaches the database first, the friend's leaving queues up behind it
+        List<Integer> statuses = runBehindRowLock(memberRowLock(groupId, friend), List.of(
                 () -> statusOfPost(owner, "/groups/%d/owner".formatted(groupId), """
                         {"userId":%d}
                         """.formatted(friend.id())),
                 () -> statusOfPost(friend, "/groups/%d/leave".formatted(groupId), "")));
 
-        // the new owner cannot leave, and a member who left cannot become the owner
-        assertEquals(1, statuses.stream()
-                .filter(status -> status == 200 || status == 204).count());
+        // by the time the leaving request gets the lock the friend is the owner, and an
+        // owner cannot leave, so the group is never left without an owner
+        assertEquals(List.of(200, 422), statuses);
         assertEquals(1, ownerCount(owner, groupId));
+        assertEquals(200, statusOfGet(friend, "/groups/%d".formatted(groupId)));
     }
 
     @Test
@@ -1237,8 +1242,8 @@ class ApplicationFlowIntegrationTest {
 
     /**
      * Holds a row lock while the actions are started one by one, each only after the previous
-     * one is waiting for a database lock. The transactions overlap and reach the database in
-     * a known order, so the outcome does not depend on timing.
+     * one is waiting for a database lock (or has already finished). The transactions overlap
+     * and reach the database in a known order, so the outcome does not depend on timing.
      */
     private List<Integer> runBehindRowLock(String lockRowSql, List<Callable<Integer>> actions)
             throws Exception {
@@ -1251,8 +1256,9 @@ class ApplicationFlowIntegrationTest {
 
             List<Future<Integer>> futures = new ArrayList<>();
             for (int i = 0; i < actions.size(); i++) {
-                futures.add(pool.submit(actions.get(i)));
-                waitUntilSessionsWaitForALock(i + 1);
+                Future<Integer> future = pool.submit(actions.get(i));
+                futures.add(future);
+                waitUntilBlockedOrDone(future, i + 1);
             }
             holder.commit();
 
@@ -1266,20 +1272,30 @@ class ApplicationFlowIntegrationTest {
         }
     }
 
-    private void waitUntilSessionsWaitForALock(int expected) throws Exception {
+    private void waitUntilBlockedOrDone(Future<Integer> future, int expectedWaiting)
+            throws Exception {
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline) {
+            if (future.isDone()) {
+                return;
+            }
             Integer waiting = jdbc.queryForObject("""
                     select count(*) from pg_stat_activity
                     where datname = current_database() and wait_event_type = 'Lock'
                     """, Integer.class);
-            if (waiting != null && waiting >= expected) {
+            if (waiting != null && waiting >= expectedWaiting) {
                 return;
             }
             Thread.sleep(20);
         }
-        throw new AssertionError("Expected " + expected + " request(s) to wait for a lock");
+        throw new AssertionError("Expected " + expectedWaiting
+                + " request(s) to wait for a lock or finish");
+    }
+
+    private static String memberRowLock(long groupId, TestUser user) {
+        return "select 1 from group_members where group_id = " + groupId
+                + " and user_id = " + user.id() + " for update";
     }
 
     private static long idOf(MvcResult result) throws Exception {
