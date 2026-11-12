@@ -882,7 +882,7 @@ class ApplicationFlowIntegrationTest {
     }
 
     @Test
-    void shouldReturn403OrNotFoundWhenOutsiderChangesMembership() throws Exception {
+    void shouldRefuseMembershipChangesFromAnOutsider() throws Exception {
         TestUser owner = registerUser(uniqueEmail());
         TestUser outsider = registerUser(uniqueEmail());
         long groupId = createGroup(owner);
@@ -986,6 +986,7 @@ class ApplicationFlowIntegrationTest {
 
         assertEquals(List.of(200, 403), statuses);
         assertEquals(1, ownerCount(owner, groupId));
+        assertEquals(first.id(), ownerId(owner, groupId));
     }
 
     @Test
@@ -1241,6 +1242,14 @@ class ApplicationFlowIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         List<Object> owners = JsonPath.read(json, "$.members[?(@.role=='OWNER')]");
         return owners.size();
+    }
+
+    private long ownerId(TestUser viewer, long groupId) throws Exception {
+        String json = fetch(viewer, "/groups/%d".formatted(groupId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Number> ownerIds = JsonPath.read(json, "$.members[?(@.role=='OWNER')].userId");
+        return ownerIds.get(0).longValue();
     }
 
     /**
