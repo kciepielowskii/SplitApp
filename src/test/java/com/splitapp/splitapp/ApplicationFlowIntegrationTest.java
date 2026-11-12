@@ -1067,6 +1067,44 @@ class ApplicationFlowIntegrationTest {
     }
 
     @Test
+    void shouldRejectNulCharactersInTextFields() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+
+        mockMvc.perform(post("/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"A\\u0000B","lastName":"Kowalski","email":"%s","password":"%s"}
+                                """.formatted(uniqueEmail(), PASSWORD)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.firstName").exists());
+
+        send(owner, "/groups", """
+                {"groupName":"G\\u0000H"}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.groupName").exists());
+
+        send(owner, "/groups", """
+                {"groupName":"Wyjazd","groupDescription":"a\\u0000b"}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.groupDescription").exists());
+
+        send(owner, "/groups/%d/expenses".formatted(groupId), """
+                {"amount":10.00,"category":"FOOD","description":"a\\u0000b","paidById":%d,"participantIds":[%d]}
+                """.formatted(owner.id(), owner.id()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.description").exists());
+
+        send(owner, "/groups/%d/invitations".formatted(groupId), """
+                {"email":"a\\u0000b@example.com"}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.email").exists());
+    }
+
+    @Test
     void shouldNotAcceptAnInvitationThatWasCancelledFirst() throws Exception {
         TestUser owner = registerUser(uniqueEmail());
         TestUser invitee = registerUser(uniqueEmail());
