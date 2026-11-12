@@ -1114,6 +1114,26 @@ class ApplicationFlowIntegrationTest {
     }
 
     @Test
+    void shouldRejectNonAsciiEmails() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+
+        mockMvc.perform(post("/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Jan","lastName":"Kowalski","email":"\\uA7C0%s","password":"%s"}
+                                """.formatted(uniqueEmail(), PASSWORD)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.email").exists());
+
+        send(owner, "/groups/%d/invitations".formatted(groupId), """
+                {"email":"\\uA7C0@example.com"}
+                """)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.email").exists());
+    }
+
+    @Test
     void shouldNotAcceptAnInvitationThatWasCancelledFirst() throws Exception {
         TestUser owner = registerUser(uniqueEmail());
         TestUser invitee = registerUser(uniqueEmail());
