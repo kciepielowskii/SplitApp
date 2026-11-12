@@ -28,11 +28,15 @@ class PasswordConfigTest {
     }
 
     @Test
-    void shouldRefuseHashesWithoutAKnownPrefix() {
+    void shouldTreatAHashWithoutAPrefixAsBcrypt() {
         String plain = new BCryptPasswordEncoder().encode("secret123");
 
-        assertThrows(IllegalArgumentException.class, () -> encoder.matches("secret123", plain));
-        assertThrows(IllegalArgumentException.class,
-                () -> encoder.matches("secret123", "{noop}secret123"));
+        assertTrue(encoder.matches("secret123", plain));
+        assertFalse(encoder.matches("other", plain));
+    }
+
+    @Test
+    void shouldNotMatchAHashWithAnUnknownPrefix() {
+        assertFalse(encoder.matches("secret123", "{noop}secret123"));
     }
 }
