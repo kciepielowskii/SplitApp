@@ -95,4 +95,43 @@ class PaymentTest {
 
         assertEquals("Receiver is not a member of this group", ex.getMessage());
     }
+
+    @Test
+    void shouldConfirmAPendingPayment() {
+        Payment payment = pendingPayment();
+
+        payment.confirm();
+
+        assertEquals(PaymentStatus.CONFIRMED, payment.getStatus());
+    }
+
+    @Test
+    void shouldRefuseToConfirmAPaymentTwice() {
+        Payment payment = pendingPayment();
+        payment.confirm();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, payment::confirm);
+
+        assertEquals("Payment is no longer pending", ex.getMessage());
+    }
+
+    @Test
+    void shouldRefuseToConfirmAPaymentTheReceiverRecordedHimself() {
+        User sender = mock(User.class);
+        User receiver = mock(User.class);
+        when(sender.getId()).thenReturn(1L);
+        when(receiver.getId()).thenReturn(2L);
+        Payment payment = new Payment(group, sender, receiver, BigDecimal.TEN, receiver);
+
+        assertEquals(PaymentStatus.CONFIRMED, payment.getStatus());
+        assertThrows(IllegalStateException.class, payment::confirm);
+    }
+
+    private Payment pendingPayment() {
+        User sender = mock(User.class);
+        User receiver = mock(User.class);
+        when(sender.getId()).thenReturn(1L);
+        when(receiver.getId()).thenReturn(2L);
+        return new Payment(group, sender, receiver, BigDecimal.TEN, sender);
+    }
 }
