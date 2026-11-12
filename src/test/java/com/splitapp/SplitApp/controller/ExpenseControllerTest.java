@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,7 +57,7 @@ class ExpenseControllerTest {
     @Test
     void shouldCreateExpense() throws Exception {
         ExpenseResponse response = new ExpenseResponse(5L, 1L, new BigDecimal("10.00"),
-                ExpenseCategory.FOOD, "Obiad", 1L, 1L,
+                ExpenseCategory.FOOD, "Obiad", 1L, 1L, Instant.parse("2026-01-01T10:00:00Z"),
                 List.of(new ExpenseSplitResponse(1L, new BigDecimal("5.00")),
                         new ExpenseSplitResponse(2L, new BigDecimal("5.00"))));
         when(expenseService.createExpense(eq(1L), eq(1L), any(CreateExpenseRequest.class)))
@@ -69,6 +70,7 @@ class ExpenseControllerTest {
                 .andExpect(jsonPath("$.id").value(5))
                 .andExpect(jsonPath("$.groupId").value(1))
                 .andExpect(jsonPath("$.paidById").value(1))
+                .andExpect(jsonPath("$.createdAt").exists())
                 .andExpect(jsonPath("$.splits[0].userId").value(1))
                 .andExpect(jsonPath("$.splits[1].userId").value(2));
     }
@@ -156,7 +158,7 @@ class ExpenseControllerTest {
     @Test
     void shouldReturnGroupExpenses() throws Exception {
         ExpenseResponse response = new ExpenseResponse(5L, 1L, new BigDecimal("10.00"),
-                ExpenseCategory.FOOD, "Obiad", 1L, 1L,
+                ExpenseCategory.FOOD, "Obiad", 1L, 1L, Instant.parse("2026-01-01T10:00:00Z"),
                 List.of(new ExpenseSplitResponse(1L, new BigDecimal("10.00"))));
         when(expenseService.getExpenses(1L, 1L)).thenReturn(List.of(response));
 
@@ -165,6 +167,7 @@ class ExpenseControllerTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(5))
                 .andExpect(jsonPath("$[0].createdById").value(1))
+                .andExpect(jsonPath("$[0].createdAt").exists())
                 .andExpect(jsonPath("$[0].splits[0].userId").value(1));
     }
 

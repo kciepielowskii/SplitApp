@@ -4,6 +4,7 @@ import com.splitapp.SplitApp.entity.Expense;
 import com.splitapp.SplitApp.entity.ExpenseCategory;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 
 public record ExpenseResponse(
@@ -14,6 +15,7 @@ public record ExpenseResponse(
         String description,
         Long paidById,
         Long createdById,
+        Instant createdAt,
         List<ExpenseSplitResponse> splits) {
 
     public static ExpenseResponse from(Expense expense) {
@@ -25,6 +27,7 @@ public record ExpenseResponse(
                 expense.getDescription(),
                 expense.getPaidBy().getId(),
                 expense.getCreatedBy().getId(),
+                expense.getCreatedAt(),
                 expense.getSplits().stream()
                         .map(ExpenseSplitResponse::from)
                         .toList());

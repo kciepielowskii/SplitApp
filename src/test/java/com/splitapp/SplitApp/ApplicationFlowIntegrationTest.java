@@ -218,6 +218,7 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].amount").value(20.0))
+                .andExpect(jsonPath("$[0].createdAt").exists())
                 .andExpect(jsonPath("$[1].amount").value(10.0))
                 .andExpect(jsonPath("$[0].splits[0].userId").value(owner.id()));
     }
