@@ -19,9 +19,9 @@ final class ProblemJson {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write("{\"type\":\"about:blank\",\"title\":\"" + title
+        response.getWriter().write("{\"type\":\"about:blank\",\"title\":\"" + escape(title)
                 + "\",\"status\":" + status.value()
-                + ",\"detail\":\"" + detail
+                + ",\"detail\":\"" + escape(detail)
                 + "\",\"instance\":\"" + escape(request.getRequestURI()) + "\"}");
     }
 
