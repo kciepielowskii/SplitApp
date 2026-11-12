@@ -23,12 +23,20 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
+import java.sql.Connection;
+import java.sql.Statement;
+import javax.sql.DataSource;
+
+
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
@@ -39,6 +47,11 @@ class ApplicationFlowIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private DataSource dataSource;
+
+    private static final int RACE_ROUNDS = 5;
 
     @Test
     void shouldRegisterUserAndCreateGroupForThem() throws Exception {
@@ -1053,6 +1066,68 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void shouldNotAcceptAnInvitationThatWasCancelledFirst() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser invitee = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        long invitationId = invite(groupId, owner, invitee.email());
+
+        // the cancellation reaches the database first, the acceptance queues up behind it
+        List<Integer> statuses = runBehindRowLock(
+                "select id from group_invitations where id = " + invitationId + " for update",
+                List.of(
+                        () -> statusOfDelete(owner,
+                                "/groups/%d/invitations/%d".formatted(groupId, invitationId)),
+                        () -> statusOfPost(invitee,
+                                "/invitations/%d/accept".formatted(invitationId), "")));
+
+        assertEquals(List.of(204, 404), statuses);
+        assertEquals(403, statusOfGet(invitee, "/groups/%d".formatted(groupId)));
+    }
+
+    @Test
+    void shouldNotCancelAnInvitationThatWasAcceptedFirst() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser invitee = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        long invitationId = invite(groupId, owner, invitee.email());
+
+        // the acceptance reaches the database first, the cancellation queues up behind it
+        List<Integer> statuses = runBehindRowLock(
+                "select id from group_invitations where id = " + invitationId + " for update",
+                List.of(
+                        () -> statusOfPost(invitee,
+                                "/invitations/%d/accept".formatted(invitationId), ""),
+                        () -> statusOfDelete(owner,
+                                "/groups/%d/invitations/%d".formatted(groupId, invitationId))));
+
+        assertEquals(List.of(200, 422), statuses);
+        assertEquals(200, statusOfGet(invitee, "/groups/%d".formatted(groupId)));
+    }
+
+    @Test
+    void shouldNotConfirmAPaymentThatWasDeletedFirst() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        long paymentId = createPayment(groupId, friend, owner, "5.00");
+        String paymentUrl = "/groups/%d/payments/%d".formatted(groupId, paymentId);
+
+        // the author's deletion reaches the database first, the confirmation queues up behind it
+        List<Integer> statuses = runBehindRowLock(
+                "select id from payments where id = " + paymentId + " for update",
+                List.of(
+                        () -> statusOfDelete(friend, paymentUrl),
+                        () -> statusOfPost(owner, paymentUrl + "/confirm", "")));
+
+        assertEquals(List.of(204, 404), statuses);
+        fetch(owner, "/groups/%d/payments".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
     private record TestUser(long id, String email) {
     }
 
@@ -1077,6 +1152,14 @@ class ApplicationFlowIntegrationTest {
 
     private int statusOfPost(TestUser user, String url, String body) throws Exception {
         return send(user, url, body).andReturn().getResponse().getStatus();
+    }
+
+    private int statusOfDelete(TestUser user, String url) throws Exception {
+        return remove(user, url).andReturn().getResponse().getStatus();
+    }
+
+    private int statusOfGet(TestUser user, String url) throws Exception {
+        return fetch(user, url).andReturn().getResponse().getStatus();
     }
 
     private int ownerCount(TestUser viewer, long groupId) throws Exception {
@@ -1112,6 +1195,53 @@ class ApplicationFlowIntegrationTest {
         } finally {
             pool.shutdownNow();
         }
+    }
+
+    /**
+     * Holds a row lock while the actions are started one by one, each only after the previous
+     * one is waiting for a database lock. The transactions overlap and reach the database in
+     * a known order, so the outcome does not depend on timing.
+     */
+    private List<Integer> runBehindRowLock(String lockRowSql, List<Callable<Integer>> actions)
+            throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(actions.size());
+        try (Connection holder = dataSource.getConnection()) {
+            holder.setAutoCommit(false);
+            try (Statement statement = holder.createStatement()) {
+                statement.execute(lockRowSql);
+            }
+
+            List<Future<Integer>> futures = new ArrayList<>();
+            for (int i = 0; i < actions.size(); i++) {
+                futures.add(pool.submit(actions.get(i)));
+                waitUntilSessionsWaitForALock(i + 1);
+            }
+            holder.commit();
+
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> future : futures) {
+                statuses.add(future.get(30, TimeUnit.SECONDS));
+            }
+            return statuses;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private void waitUntilSessionsWaitForALock(int expected) throws Exception {
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            Integer waiting = jdbc.queryForObject("""
+                    select count(*) from pg_stat_activity
+                    where datname = current_database() and wait_event_type = 'Lock'
+                    """, Integer.class);
+            if (waiting != null && waiting >= expected) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("Expected " + expected + " request(s) to wait for a lock");
     }
 
     private static long idOf(MvcResult result) throws Exception {
