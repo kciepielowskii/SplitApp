@@ -1173,6 +1173,19 @@ class ApplicationFlowIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
+    @Test
+    void shouldPublishTheApiDescriptionWithoutLogin() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.securitySchemes.basicAuth.scheme").value("basic"))
+                .andExpect(jsonPath("$.paths['/groups']").exists())
+                .andExpect(jsonPath("$.paths['/users'].post.security").isEmpty())
+                .andExpect(jsonPath("$.paths['/groups'].get.parameters").doesNotExist());
+
+        mockMvc.perform(get("/groups"))
+                .andExpect(status().isUnauthorized());
+    }
+
     private record TestUser(long id, String email) {
     }
 
