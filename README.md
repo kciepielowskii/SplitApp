@@ -40,9 +40,10 @@ published to the host, so it cannot clash with a PostgreSQL you already run.
 
 ### Without Docker
 
-You need Java 17 and a PostgreSQL 16 database. Put the connection in `.env` (see
-`.env.example`: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`), then run `./mvnw spring-boot:run`.
-Flyway creates the schema on start.
+You need Java 17 and a PostgreSQL 16 server. Create a database (for example
+`createdb splitapp`), copy `.env.example` to `.env` and adjust `DB_URL`, `DB_USERNAME` and
+`DB_PASSWORD` to your server, then run `./mvnw spring-boot:run`. Flyway creates the schema
+on start.
 
 ### Tests
 
@@ -54,22 +55,61 @@ Docker has to be running: the tests start PostgreSQL 16.15 with Testcontainers.
 
 ## Trying it
 
+The ids below (users 1 and 2, group 1, invitation 1, payment 1) assume a fresh database.
+
+Register two users:
+
 ```
 curl -X POST localhost:8080/users -H 'Content-Type: application/json' \
   -d '{"firstName":"Jan","lastName":"Kowalski","email":"jan@example.com","password":"secret123"}'
 
+curl -X POST localhost:8080/users -H 'Content-Type: application/json' \
+  -d '{"firstName":"Anna","lastName":"Nowak","email":"anna@example.com","password":"secret123"}'
+```
+
+Jan creates a group and invites Anna, and Anna accepts:
+
+```
 curl -u jan@example.com:secret123 -X POST localhost:8080/groups \
   -H 'Content-Type: application/json' -d '{"groupName":"Trip"}'
 
-curl -u jan@example.com:secret123 localhost:8080/groups
+curl -u jan@example.com:secret123 -X POST localhost:8080/groups/1/invitations \
+  -H 'Content-Type: application/json' -d '{"email":"anna@example.com"}'
+
+curl -u anna@example.com:secret123 -X POST localhost:8080/invitations/1/accept \
+  -H 'Content-Type: application/json'
+```
+
+Jan paid 60.00 for a dinner shared equally, so Anna owes him 30.00:
+
+```
+curl -u jan@example.com:secret123 -X POST localhost:8080/groups/1/expenses \
+  -H 'Content-Type: application/json' \
+  -d '{"amount":60.00,"category":"FOOD","description":"Dinner","paidById":1,"splitType":"EQUAL","participantIds":[1,2]}'
+
+curl -u jan@example.com:secret123 localhost:8080/groups/1/balances
+```
+
+Anna pays Jan back. The payment counts once Jan confirms it:
+
+```
+curl -u anna@example.com:secret123 -X POST localhost:8080/groups/1/payments \
+  -H 'Content-Type: application/json' -d '{"senderId":2,"receiverId":1,"amount":30.00}'
+
+curl -u jan@example.com:secret123 -X POST localhost:8080/groups/1/payments/1/confirm \
+  -H 'Content-Type: application/json'
+
+curl -u jan@example.com:secret123 localhost:8080/groups/1/balances
 ```
 
 Every `POST` must be sent with `Content-Type: application/json`, also the ones without a
-body (accept, decline, confirm, leave), otherwise the answer is 415 (or 401 when an endpoint that needs credentials is called without them).
+body (accept, decline, confirm, leave), otherwise the answer is 415 (or 401 when an endpoint
+that needs credentials is called without them).
 
 ## API
 
-"Member" means a member of the group in the path. Every endpoint except `POST /users` and the API description (OpenAPI and Swagger UI) needs HTTP Basic credentials.
+"Member" means a member of the group in the path. Every endpoint except `POST /users` and the
+API description (OpenAPI and Swagger UI) needs HTTP Basic credentials.
 
 | Method and path | Who | What |
 |---|---|---|
@@ -130,12 +170,17 @@ database never sees two owners.
 payments, and entries that involve a former member cannot be deleted (not even by the
 owner). So the history of someone who left stays consistent.
 
-**Errors.** Every error the application produces is an `application/problem+json` (RFC 9457), including the ones
-produced before Spring MVC (401, 415). Database errors are mapped by SQLState and never
-expose the conflicting values: a unique violation is a 409, a value the database cannot
-store is a 400, and any other integrity violation (`CHECK`, foreign key) means a bug in the
-code and gives a 500. Convention: `409` is a duplicate registration, a unique-constraint conflict or a concurrent change (retrying may help); `422` is any other business rule the request breaks, including a state that does not allow it (for example an invitation that is already pending or a payment that is already confirmed); `400` is a malformed or invalid request. Messages are always in English
-(`spring.web.locale-resolver=fixed`).
+**Errors.** Every error the application produces is an `application/problem+json`
+(RFC 9457), including the ones produced before Spring MVC (401, 415). Database errors are
+mapped by SQLState and never expose the conflicting values: a unique violation is a 409, a
+value the database cannot store is a 400, and any other integrity violation (`CHECK`,
+foreign key) means a bug in the code and gives a 500. Convention: `409` is a duplicate
+registration, a unique-constraint conflict or a concurrent change (retrying may help);
+`422` is any other business rule the request breaks, including a state that does not allow
+it (for example an invitation that is already pending or a payment that is already
+confirmed) and rules that tie several fields together (for example a split type that does
+not match the shares); `400` is a malformed request or an invalid value in a single field.
+Messages are always in English (`spring.web.locale-resolver=fixed`).
 
 **CSRF is off, deliberately.** The API is stateless and uses Basic auth, which browsers cache
 and resend, so a cross-site form post would be authenticated. It is stopped by a filter that
@@ -153,10 +198,10 @@ requests one by one, waits (through `pg_stat_activity`) until each is blocked, a
 releases the lock, so the outcome never depends on timing. Each of these tests was checked
 to fail when the lock in the code is removed.
 
-**CI.** GitHub Actions runs the tests on every pull request to `develop` or `main` and on
-every push to them, with actions pinned by commit SHA and Dependabot keeping them (and the
-Maven dependencies) up to date. The Maven wrapper verifies the SHA-256 of the Maven
-distribution.
+**CI.** GitHub Actions runs the tests and builds the Docker image on every pull request to
+`develop` or `main` and on every push to them, with actions pinned by commit SHA and
+Dependabot keeping them (and the Maven dependencies) up to date. The Maven wrapper verifies
+the SHA-256 of the Maven distribution.
 
 ## Settlement suggestions
 
@@ -182,8 +227,13 @@ account until the receiver confirms them.
   entries that involve a former member. There is no way to delete a group.
 - **404 and 403.** A group that does not exist answers 404 and one that exists but you do not
   belong to answers 403, so a response reveals which group ids exist.
-- **User ids in a request body.** An id that does not exist (in `paidById`, `participantIds`, `shares`, `senderId`, `receiverId`) answers 404, while an existing user who is not in the group answers 422, so a group member can find out which user ids exist.
-- **Odd URLs.** Requests that Tomcat or Spring Security's URL firewall refuse before the application sees them are not `problem+json`: a path with an encoded slash (`%2F`) gets Tomcat's HTML 400 page, and a path with a semicolon is reported as a 401. Normal clients never send such URLs.
+- **User ids in a request body.** An id that does not exist (in `paidById`,
+  `participantIds`, `shares`, `senderId`, `receiverId`) answers 404, while an existing user
+  who is not in the group answers 422, so a group member can find out which user ids exist.
+- **Odd URLs.** Requests that Tomcat or Spring Security's URL firewall refuse before the
+  application sees them are not `problem+json`: a path with an encoded slash (`%2F`) gets
+  Tomcat's HTML 400 page, and a path with a semicolon is reported as a 401. Normal clients
+  never send such URLs.
 - **Payments.** The amount of a payment is not capped at the debt. Pending payments do not
   affect balances or suggestions. `paidAt` is the time the payment was recorded, not a date
   the user supplies.
