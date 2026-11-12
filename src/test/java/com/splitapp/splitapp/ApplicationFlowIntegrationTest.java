@@ -7,37 +7,32 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
-
-import java.util.List;
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.UUID;
 
-import java.sql.Connection;
-import java.sql.Statement;
-import javax.sql.DataSource;
-
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import org.springframework.jdbc.core.JdbcTemplate;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -50,8 +45,6 @@ class ApplicationFlowIntegrationTest {
 
     @Autowired
     private DataSource dataSource;
-
-    private static final int RACE_ROUNDS = 5;
 
     @Test
     void shouldRegisterUserAndCreateGroupForThem() throws Exception {
@@ -1035,6 +1028,15 @@ class ApplicationFlowIntegrationTest {
         assertEquals(List.of(200, 422), statuses);
         assertEquals(1, ownerCount(owner, groupId));
         assertEquals(200, statusOfGet(friend, "/groups/%d".formatted(groupId)));
+    }
+
+    @Test
+    void shouldNotExposeTheDefaultLogoutEndpoint() throws Exception {
+        mockMvc.perform(get("/logout"))
+                .andExpect(status().isUnauthorized());
+
+        TestUser user = registerUser(uniqueEmail());
+        fetch(user, "/logout").andExpect(status().isNotFound());
     }
 
     @Test

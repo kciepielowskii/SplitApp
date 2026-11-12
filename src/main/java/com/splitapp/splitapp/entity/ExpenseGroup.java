@@ -108,9 +108,10 @@ public class ExpenseGroup {
     }
 
     /**
-     * Same as above, but {@code betweenSteps} runs after the current owner was demoted and
-     * before the new owner is promoted. The caller can flush there, so that the database
-     * never sees two owners of one group.
+     * The current owner becomes a regular member and the new owner takes over.
+     * {@code betweenSteps} runs after the current owner was demoted and before the new owner
+     * is promoted. The caller can flush there, so that the database never sees two owners
+     * of one group.
      */
     public void transferOwnership(Long currentOwnerId, Long newOwnerId, Runnable betweenSteps) {
         Objects.requireNonNull(betweenSteps, "The step between demotion and promotion is required");

@@ -25,7 +25,8 @@ public class GroupAccess {
      * Like {@link #requireMember}, but also locks the group row until the end of the
      * transaction. Every operation that changes who is in the group, who owns it, or its
      * money has to use this one, so such operations on a single group run one after another.
-     * The lock is taken before anything else about the group is read.
+     * Only the membership is checked before the lock, so that an outsider cannot lock the
+     * group; everything else is read after it, and the membership is checked again..
      */
     public void requireMemberAndLock(Long groupId, Long userId) {
         requireMember(groupId, userId);

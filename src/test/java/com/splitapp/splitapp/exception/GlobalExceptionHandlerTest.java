@@ -7,6 +7,9 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.MethodParameter;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
@@ -14,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.validation.BeanPropertyBindingResult;
@@ -22,9 +26,6 @@ import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.lang.reflect.Method;
 import java.sql.SQLException;
@@ -36,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
+@ExtendWith(OutputCaptureExtension.class)
 class GlobalExceptionHandlerTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
     private final Validator validator =
@@ -270,6 +272,17 @@ class GlobalExceptionHandlerTest {
         ProblemDetail result = handler.handleDataIntegrityViolation(exception);
 
         assertEquals(HttpStatus.CONFLICT.value(), result.getStatus());
+    }
+
+    @Test
+    void shouldNotLogTheMessageOfAnUnexpectedDatabaseException(CapturedOutput output) {
+        ProblemDetail problem = handler.handleUnexpected(new UncategorizedSQLException(
+                "insert", "insert into users values ('secret@example.com')",
+                new SQLException("secret@example.com", "XX000")));
+
+        assertEquals(500, problem.getStatus());
+        assertTrue(output.getAll().contains("Unexpected database error"));
+        assertFalse(output.getAll().contains("secret@example.com"));
     }
 
     @SuppressWarnings("unused")
