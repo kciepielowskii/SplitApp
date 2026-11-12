@@ -87,9 +87,12 @@ public class PaymentService {
                 .orElseThrow(() -> new PaymentNotFoundException("Payment not found"));
 
         boolean isAuthor = payment.getCreatedBy().getId().equals(currentUserId);
-        if (!isAuthor && !payment.getGroup().isOwner(currentUserId)) {
-            throw new GroupAccessDeniedException(
-                    "Only the author or the group owner can delete this payment");
+        boolean isReceiverOfPendingPayment = payment.getStatus() == PaymentStatus.PENDING
+                && payment.getReceiver().getId().equals(currentUserId);
+        if (!isAuthor && !isReceiverOfPendingPayment
+                && !payment.getGroup().isOwner(currentUserId)) {
+            throw new GroupAccessDeniedException("Only the author, the receiver of a pending "
+                    + "payment or the group owner can delete this payment");
         }
         if (involvesFormerMember(payment)) {
             throw new BusinessRuleException(
