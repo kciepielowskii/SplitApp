@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [develop, main]
   push:
-    branches: [ develop, main ]
+    branches: [develop, main]
 
 permissions:
   contents: read
@@ -28,12 +28,9 @@ jobs:
 
       - name: Run tests
         run: ./mvnw -B clean test
-        env:
-          # placeholders from application.properties; tests use a Testcontainers database,
-          # so these values are never used to connect anywhere
-          DB_URL: jdbc:postgresql://localhost:5432/unused
-          DB_USERNAME: unused
-          DB_PASSWORD: unused
+
+      - name: Build the Docker image
+        run: docker build -t splitapp:ci .
 
       - name: Upload test reports
         if: failure()
