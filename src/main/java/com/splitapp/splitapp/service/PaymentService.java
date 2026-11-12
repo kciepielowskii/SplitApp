@@ -1,0 +1,127 @@
+package com.splitapp.splitapp.service;
+
+import com.splitapp.splitapp.dto.CreatePaymentRequest;
+import com.splitapp.splitapp.dto.PaymentResponse;
+import com.splitapp.splitapp.entity.ExpenseGroup;
+import com.splitapp.splitapp.entity.Payment;
+import com.splitapp.splitapp.entity.PaymentStatus;
+import com.splitapp.splitapp.entity.User;
+import com.splitapp.splitapp.exception.BusinessRuleException;
+import com.splitapp.splitapp.exception.GroupNotFoundException;
+import com.splitapp.splitapp.exception.PaymentNotFoundException;
+import com.splitapp.splitapp.exception.UserNotFoundException;
+import com.splitapp.splitapp.repository.GroupRepository;
+import com.splitapp.splitapp.repository.PaymentRepository;
+import com.splitapp.splitapp.repository.UserRepository;
+import com.splitapp.splitapp.exception.GroupAccessDeniedException;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+
+@Service
+@Validated
+@RequiredArgsConstructor
+public class PaymentService {
+    private final PaymentRepository paymentRepository;
+    private final GroupRepository groupRepository;
+    private final UserRepository userRepository;
+    private final GroupAccess groupAccess;
+
+    @Transactional
+    public PaymentResponse createPayment(@NotNull Long groupId, @NotNull Long currentUserId,
+                                         @NotNull @Valid CreatePaymentRequest request) {
+        groupAccess.requireMemberAndLock(groupId, currentUserId);
+
+        if (!currentUserId.equals(request.senderId())
+                && !currentUserId.equals(request.receiverId())) {
+            throw new GroupAccessDeniedException(
+                    "You can only record payments you are part of");
+        }
+
+        ExpenseGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException("Group not found"));
+
+        if (request.senderId().equals(request.receiverId())) {
+            throw new BusinessRuleException("Sender and receiver must differ");
+        }
+
+        User sender = userRepository.findById(request.senderId())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        User receiver = userRepository.findById(request.receiverId())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        requireMember(group, sender, "Sender is not a member of this group");
+        requireMember(group, receiver, "Receiver is not a member of this group");
+
+        BigDecimal amount = request.amount().setScale(2, RoundingMode.UNNECESSARY);
+        User createdBy = currentUserId.equals(sender.getId()) ? sender : receiver;
+        Payment payment = new Payment(group, sender, receiver, amount, createdBy);
+        return PaymentResponse.from(paymentRepository.save(payment));
+    }
+
+    private static void requireMember(ExpenseGroup group, User user, String message) {
+        if (!group.hasMember(user)) {
+            throw new BusinessRuleException(message);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentResponse> getPayments(@NotNull Long groupId, @NotNull Long currentUserId) {
+        groupAccess.requireMember(groupId, currentUserId);
+        return paymentRepository.findAllByGroupIdOrderByPaidAtDescIdDesc(groupId).stream()
+                .map(PaymentResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public void deletePayment(@NotNull Long groupId, @NotNull Long currentUserId,
+                              @NotNull Long paymentId) {
+        groupAccess.requireMemberAndLock(groupId, currentUserId);
+        Payment payment = paymentRepository.findByIdAndGroupId(paymentId, groupId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found"));
+
+        boolean isAuthor = payment.getCreatedBy().getId().equals(currentUserId);
+        boolean isReceiverOfPendingPayment = payment.getStatus() == PaymentStatus.PENDING
+                && payment.getReceiver().getId().equals(currentUserId);
+        if (!isAuthor && !isReceiverOfPendingPayment
+                && !payment.getGroup().isOwner(currentUserId)) {
+            throw new GroupAccessDeniedException("Only the author, the receiver of a pending "
+                    + "payment or the group owner can delete this payment");
+        }
+        if (involvesFormerMember(payment)) {
+            throw new BusinessRuleException(
+                    "Cannot delete a payment that involves a user who has left the group");
+        }
+
+        paymentRepository.delete(payment);
+    }
+
+    private static boolean involvesFormerMember(Payment payment) {
+        ExpenseGroup group = payment.getGroup();
+        return !group.hasMember(payment.getSender()) || !group.hasMember(payment.getReceiver());
+    }
+
+    @Transactional
+    public PaymentResponse confirmPayment(@NotNull Long groupId, @NotNull Long currentUserId,
+                                          @NotNull Long paymentId) {
+        groupAccess.requireMemberAndLock(groupId, currentUserId);
+        Payment payment = paymentRepository.findByIdAndGroupId(paymentId, groupId)
+                .orElseThrow(() -> new PaymentNotFoundException("Payment not found"));
+
+        if (!payment.getReceiver().getId().equals(currentUserId)) {
+            throw new GroupAccessDeniedException("Only the receiver can confirm this payment");
+        }
+        if (payment.getStatus() == PaymentStatus.CONFIRMED) {
+            throw new BusinessRuleException("Payment is already confirmed");
+        }
+
+        payment.confirm();
+        return PaymentResponse.from(payment);
+    }
+}
