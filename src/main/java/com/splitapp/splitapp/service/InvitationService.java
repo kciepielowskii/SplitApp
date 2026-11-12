@@ -1,0 +1,156 @@
+package com.splitapp.splitapp.service;
+
+import com.splitapp.splitapp.dto.GroupResponse;
+import com.splitapp.splitapp.dto.InvitationResponse;
+import com.splitapp.splitapp.dto.PendingInvitationResponse;
+import com.splitapp.splitapp.entity.ExpenseGroup;
+import com.splitapp.splitapp.entity.GroupInvitation;
+import com.splitapp.splitapp.entity.GroupRole;
+import com.splitapp.splitapp.entity.InvitationStatus;
+import com.splitapp.splitapp.entity.User;
+import com.splitapp.splitapp.exception.BusinessRuleException;
+import com.splitapp.splitapp.exception.GroupAccessDeniedException;
+import com.splitapp.splitapp.exception.GroupNotFoundException;
+import com.splitapp.splitapp.exception.InvitationNotFoundException;
+import com.splitapp.splitapp.exception.UserNotFoundException;
+import com.splitapp.splitapp.repository.GroupInvitationRepository;
+import com.splitapp.splitapp.repository.GroupRepository;
+import com.splitapp.splitapp.repository.UserRepository;
+import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
+
+import java.util.List;
+
+@Service
+@Validated
+@RequiredArgsConstructor
+public class InvitationService {
+    private final GroupInvitationRepository invitationRepository;
+    private final GroupRepository groupRepository;
+    private final UserRepository userRepository;
+    private final GroupAccess groupAccess;
+
+    /**
+     * Succeeds whether or not an account exists for the e-mail, so the endpoint cannot be used
+     * to find out who is registered.
+     */
+    @Transactional
+    public InvitationResponse invite(@NotNull Long groupId, @NotNull Long currentUserId,
+                                     @NotNull String email) {
+        ExpenseGroup group = lockGroupAsOwner(groupId, currentUserId,
+                "Only the group owner can invite members");
+        String normalized = User.normalizeEmail(email);
+
+        boolean alreadyMember = group.getMembers().stream()
+                .anyMatch(member -> member.getUser().getEmail().equals(normalized));
+        if (alreadyMember) {
+            throw new BusinessRuleException("User is already a member of this group");
+        }
+        if (invitationRepository.existsByGroupIdAndEmailAndStatus(
+                groupId, normalized, InvitationStatus.PENDING)) {
+            throw new BusinessRuleException("This e-mail already has a pending invitation");
+        }
+
+        User inviter = userRepository.getReferenceById(currentUserId);
+        GroupInvitation invitation = new GroupInvitation(group, normalized, inviter);
+        return InvitationResponse.from(invitationRepository.save(invitation));
+    }
+
+    @Transactional(readOnly = true)
+    public List<InvitationResponse> getGroupInvitations(@NotNull Long groupId,
+                                                        @NotNull Long currentUserId) {
+        loadGroupAsOwner(groupId, currentUserId, "Only the group owner can view invitations");
+        return invitationRepository
+                .findAllByGroupIdAndStatusOrderByIdDesc(groupId, InvitationStatus.PENDING).stream()
+                .map(InvitationResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public void cancelInvitation(@NotNull Long groupId, @NotNull Long currentUserId,
+                                 @NotNull Long invitationId) {
+        lockGroupAsOwner(groupId, currentUserId, "Only the group owner can cancel invitations");
+        GroupInvitation invitation = invitationRepository.findByIdAndGroupId(invitationId, groupId)
+                .orElseThrow(() -> new InvitationNotFoundException("Invitation not found"));
+        if (!invitation.isPending()) {
+            throw new BusinessRuleException("Only a pending invitation can be cancelled");
+        }
+        invitationRepository.delete(invitation);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PendingInvitationResponse> getMyInvitations(@NotNull Long currentUserId) {
+        User user = loadUser(currentUserId);
+        return invitationRepository
+                .findAllByEmailAndStatusOrderByIdDesc(user.getEmail(), InvitationStatus.PENDING)
+                .stream()
+                .map(PendingInvitationResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public GroupResponse acceptInvitation(@NotNull Long currentUserId, @NotNull Long invitationId) {
+        User user = loadUser(currentUserId);
+        GroupInvitation invitation = lockGroupAndFindMyPendingInvitation(user, invitationId);
+        ExpenseGroup group = groupRepository.findWithMembersById(invitation.getGroup().getId())
+                .orElseThrow(() -> new GroupNotFoundException("Group not found"));
+
+        if (!group.hasMember(user)) {
+            group.addMember(user, GroupRole.MEMBER);
+        }
+        invitation.accept();
+        return GroupResponse.from(group);
+    }
+
+    @Transactional
+    public void declineInvitation(@NotNull Long currentUserId, @NotNull Long invitationId) {
+        User user = loadUser(currentUserId);
+        lockGroupAndFindMyPendingInvitation(user, invitationId).decline();
+    }
+
+    private ExpenseGroup loadGroupAsOwner(Long groupId, Long currentUserId, String denyMessage) {
+        groupAccess.requireMember(groupId, currentUserId);
+        return requireOwner(groupId, currentUserId, denyMessage);
+    }
+
+    private ExpenseGroup lockGroupAsOwner(Long groupId, Long currentUserId, String denyMessage) {
+        groupAccess.requireMemberAndLock(groupId, currentUserId);
+        return requireOwner(groupId, currentUserId, denyMessage);
+    }
+
+    private ExpenseGroup requireOwner(Long groupId, Long currentUserId, String denyMessage) {
+        ExpenseGroup group = groupRepository.findWithMembersById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException("Group not found"));
+        if (!group.isOwner(currentUserId)) {
+            throw new GroupAccessDeniedException(denyMessage);
+        }
+        return group;
+    }
+
+    private User loadUser(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+    }
+
+    // Someone else's, already answered and non-existent invitations all look the same: 404.
+    private GroupInvitation findMyPendingInvitation(User user, Long invitationId) {
+        return invitationRepository
+                .findByIdAndEmailAndStatus(invitationId, user.getEmail(), InvitationStatus.PENDING)
+                .orElseThrow(() -> new InvitationNotFoundException("Invitation not found"));
+    }
+
+    /**
+     * The group is known only through the invitation, so the invitation is read first, then the
+     * group is locked, and the invitation is checked again: it may have been cancelled or
+     * answered while this request waited for the lock.
+     */
+    private GroupInvitation lockGroupAndFindMyPendingInvitation(User user, Long invitationId) {
+        Long groupId = findMyPendingInvitation(user, invitationId).getGroup().getId();
+        groupRepository.findByIdForUpdate(groupId)
+                .orElseThrow(() -> new GroupNotFoundException("Group not found"));
+        return findMyPendingInvitation(user, invitationId);
+    }
+}
