@@ -130,7 +130,7 @@ database never sees two owners.
 payments, and entries that involve a former member cannot be deleted (not even by the
 owner). So the history of someone who left stays consistent.
 
-**Errors.** Every error is an `application/problem+json` (RFC 9457), including the ones
+**Errors.** Every error the application produces is an `application/problem+json` (RFC 9457), including the ones
 produced before Spring MVC (401, 415). Database errors are mapped by SQLState and never
 expose the conflicting values: a unique violation is a 409, a value the database cannot
 store is a 400, and any other integrity violation (`CHECK`, foreign key) means a bug in the
@@ -183,6 +183,7 @@ account until the receiver confirms them.
 - **404 and 403.** A group that does not exist answers 404 and one that exists but you do not
   belong to answers 403, so a response reveals which group ids exist.
 - **User ids in a request body.** An id that does not exist (in `paidById`, `participantIds`, `shares`, `senderId`, `receiverId`) answers 404, while an existing user who is not in the group answers 422, so a group member can find out which user ids exist.
+- **Odd URLs.** Requests that Tomcat or Spring Security's URL firewall refuse before the application sees them are not `problem+json`: a path with an encoded slash (`%2F`) gets Tomcat's HTML 400 page, and a path with a semicolon is reported as a 401. Normal clients never send such URLs.
 - **Payments.** The amount of a payment is not capped at the debt. Pending payments do not
   affect balances or suggestions. `paidAt` is the time the payment was recorded, not a date
   the user supplies.
