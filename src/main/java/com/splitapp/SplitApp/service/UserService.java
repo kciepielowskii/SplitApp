@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-
 @Service
 @Validated
 @RequiredArgsConstructor
@@ -22,7 +21,6 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Transactional
     public UserResponse register(@Valid @NotNull RegisterUserRequest request) {
         String email = User.normalizeEmail(request.email());
         if (userRepository.existsByEmail(email)) {

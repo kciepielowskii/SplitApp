@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.beans.TypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -37,6 +40,26 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 errors.putIfAbsent("_global", error.getDefaultMessage()));
 
         return handleExceptionInternal(exception, validationProblem(errors), headers, status, request);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException exception, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "Malformed request",
+                "The request body is missing or malformed");
+        return handleExceptionInternal(exception, problem, headers, status, request);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(
+            TypeMismatchException exception, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        String detail = exception instanceof MethodArgumentTypeMismatchException mismatch
+                ? "Parameter '" + mismatch.getName() + "' has an invalid value"
+                : "A request parameter has an invalid value";
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "Invalid parameter", detail);
+        return handleExceptionInternal(exception, problem, headers, status, request);
     }
 
     @ExceptionHandler(UserNotFoundException.class)
