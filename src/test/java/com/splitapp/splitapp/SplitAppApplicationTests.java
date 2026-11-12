@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Import;
 @Import(TestcontainersConfiguration.class)
 class SplitAppApplicationTests {
 
-	@Test
-	void contextLoads() {
-	}
+    @Test
+    void contextLoads() {
+    }
 }

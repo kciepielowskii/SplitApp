@@ -18,7 +18,7 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("SplitApp API")
-                        .version("0.0.1")
+                        .version("1.0.0")
                         .description("""
                                 REST API for splitting shared expenses within a group.
 

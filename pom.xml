@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.splitapp</groupId>
 	<artifactId>SplitApp</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<name>SplitApp</name>
 	<description>REST API for splitting shared expenses within a group</description>
 	<properties>

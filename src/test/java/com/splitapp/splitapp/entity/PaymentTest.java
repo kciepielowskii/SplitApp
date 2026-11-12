@@ -116,7 +116,7 @@ class PaymentTest {
     }
 
     @Test
-    void shouldRefuseToConfirmAPaymentTheReceiverRecordedHimself() {
+    void shouldRefuseToConfirmAPaymentRecordedByItsReceiver() {
         User sender = mock(User.class);
         User receiver = mock(User.class);
         when(sender.getId()).thenReturn(1L);

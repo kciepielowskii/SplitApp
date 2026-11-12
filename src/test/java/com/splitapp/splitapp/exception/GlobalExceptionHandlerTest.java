@@ -248,7 +248,6 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @ExtendWith(OutputCaptureExtension.class)
     void shouldAnswer400WhenTheDatabaseRefusesAValue(CapturedOutput output) {
         DataIntegrityViolationException exception = new DataIntegrityViolationException(
                 "invalid byte sequence (secret-value)",
