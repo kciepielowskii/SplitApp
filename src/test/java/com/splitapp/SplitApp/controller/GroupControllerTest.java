@@ -9,6 +9,7 @@ import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.security.SecurityConfig;
 import com.splitapp.SplitApp.security.WithMockAppUser;
 import com.splitapp.SplitApp.service.GroupService;
+import com.splitapp.SplitApp.dto.GroupSummaryResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -169,5 +170,20 @@ class GroupControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.title").value("Forbidden"))
                 .andExpect(jsonPath("$.detail").value("You are not a member of this group"));
+    }
+    @Test
+    void shouldListTheGroupsOfTheLoggedInUser() throws Exception {
+        when(groupService.getMyGroups(1L)).thenReturn(List.of(
+                new GroupSummaryResponse(2L, "Wspólna", null, GroupRole.MEMBER),
+                new GroupSummaryResponse(1L, "Wyjazd", "Weekend w górach", GroupRole.OWNER)));
+
+        mockMvc.perform(get("/groups"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(2))
+                .andExpect(jsonPath("$[0].myRole").value("MEMBER"))
+                .andExpect(jsonPath("$[1].groupDescription").value("Weekend w górach"))
+                .andExpect(jsonPath("$[1].myRole").value("OWNER"))
+                .andExpect(jsonPath("$[0].members").doesNotExist());
     }
 }

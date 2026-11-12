@@ -1018,6 +1018,40 @@ class ApplicationFlowIntegrationTest {
         assertEquals(1, ownerCount(owner, groupId));
     }
 
+    @Test
+    void shouldLetAClientDiscoverItsOwnUserAndGroups() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long first = createGroup(owner);
+        long second = createGroup(friend);
+        addMember(second, friend, owner);
+        createGroup(friend);
+
+        fetch(owner, "/users/me")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(owner.id()))
+                .andExpect(jsonPath("$.email").value(owner.email()))
+                .andExpect(jsonPath("$.password").doesNotExist());
+
+        // only the groups the caller belongs to, newest first, with the caller's own role
+        fetch(owner, "/groups")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(second))
+                .andExpect(jsonPath("$[0].myRole").value("MEMBER"))
+                .andExpect(jsonPath("$[1].id").value(first))
+                .andExpect(jsonPath("$[1].myRole").value("OWNER"))
+                .andExpect(jsonPath("$[0].members").doesNotExist());
+    }
+
+    @Test
+    void shouldRequireCredentialsToDiscoverOwnUserAndGroups() throws Exception {
+        mockMvc.perform(get("/users/me"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/groups"))
+                .andExpect(status().isUnauthorized());
+    }
+
     private record TestUser(long id, String email) {
     }
 
