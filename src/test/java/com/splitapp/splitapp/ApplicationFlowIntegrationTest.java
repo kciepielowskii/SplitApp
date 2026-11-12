@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -973,7 +972,11 @@ class ApplicationFlowIntegrationTest {
         addMember(groupId, owner, second);
         String url = "/groups/%d/owner".formatted(groupId);
 
-        List<Integer> statuses = runAtTheSameTime(List.of(
+        // the first transfer takes the group lock and waits for the owner's member row (which
+        // it has to demote), the second waits for the group lock; once the row is released
+        // they run one after another, so the second one always finds that the caller is no
+        // longer the owner
+        List<Integer> statuses = runBehindRowLock(memberRowLock(groupId, owner), List.of(
                 () -> statusOfPost(owner, url, """
                         {"userId":%d}
                         """.formatted(first.id())),
@@ -981,9 +984,7 @@ class ApplicationFlowIntegrationTest {
                         {"userId":%d}
                         """.formatted(second.id()))));
 
-        // the second transfer finds out that the caller is no longer the owner
-        assertEquals(1, statuses.stream().filter(status -> status == 200).count());
-        assertEquals(1, statuses.stream().filter(status -> status == 403).count());
+        assertEquals(List.of(200, 403), statuses.stream().sorted().toList());
         assertEquals(1, ownerCount(owner, groupId));
     }
 
@@ -1226,33 +1227,6 @@ class ApplicationFlowIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         List<Object> owners = JsonPath.read(json, "$.members[?(@.role=='OWNER')]");
         return owners.size();
-    }
-
-    // starts all actions together, so that their transactions overlap
-    private List<Integer> runAtTheSameTime(List<Callable<Integer>> actions) throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(actions.size());
-        try {
-            CountDownLatch ready = new CountDownLatch(actions.size());
-            CountDownLatch start = new CountDownLatch(1);
-            List<Future<Integer>> futures = new ArrayList<>();
-            for (Callable<Integer> action : actions) {
-                futures.add(pool.submit(() -> {
-                    ready.countDown();
-                    start.await();
-                    return action.call();
-                }));
-            }
-            ready.await();
-            start.countDown();
-
-            List<Integer> statuses = new ArrayList<>();
-            for (Future<Integer> future : futures) {
-                statuses.add(future.get(30, TimeUnit.SECONDS));
-            }
-            return statuses;
-        } finally {
-            pool.shutdownNow();
-        }
     }
 
     /**
