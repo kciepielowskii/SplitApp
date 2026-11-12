@@ -12,7 +12,8 @@ run against a real PostgreSQL, including deterministic tests for race conditions
 - Register and authenticate with email and password (HTTP Basic).
 - Create groups; the creator is the owner. The owner invites people by email, an invited
   user accepts or declines.
-- Record expenses (who paid, who shares it). Every split adds up to the exact total.
+- Record expenses (who paid, who shares it), split equally or by percentages. Every split
+  adds up to the exact total.
 - Record payments between members. A payment is pending until the receiver confirms it.
 - See every member's balance and suggested transfers that bring all balances to zero.
 - The owner can hand the group over to another member. A member can leave once settled up.
@@ -85,7 +86,7 @@ needs HTTP Basic credentials.
 | `POST /groups/{groupId}/expenses` | member | Record an expense |
 | `GET /groups/{groupId}/expenses` | member | List expenses, newest first |
 | `DELETE /groups/{groupId}/expenses/{expenseId}` | author or owner | Delete an expense |
-| `POST /groups/{groupId}/payments` | member | Record a payment to another member |
+| `POST /groups/{groupId}/payments` | sender or receiver | Record a payment between two members (the caller is one of them) |
 | `GET /groups/{groupId}/payments` | member | List payments, newest first |
 | `POST /groups/{groupId}/payments/{paymentId}/confirm` | receiver | Confirm a payment |
 | `DELETE /groups/{groupId}/payments/{paymentId}` | author, owner or receiver of a pending payment | Delete a payment |
@@ -100,7 +101,9 @@ code.
 
 **Money.** Amounts are `numeric(10,2)` in the database and are computed in cents as `long`,
 so there is no floating point and no rounding drift. When a split does not divide evenly,
-the remaining cents are handed out one by one, so the parts always add up to the total.
+the remaining cents are handed out one by one (to the first participants for an equal split,
+to the largest fractional parts for a percentage split), so the parts always add up to the
+total.
 
 **Rules live in the database too.** Besides the checks in the code, the schema enforces them:
 `CHECK` constraints on amounts and enum values, a payment cannot go from a user to
