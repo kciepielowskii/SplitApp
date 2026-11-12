@@ -250,3 +250,7 @@ account until the receiver confirms them.
 - **`lock_timeout` is 5 seconds for every connection**, also the one Flyway uses.
 - **Updates.** The PostgreSQL image is pinned to an exact version and is updated by hand,
   together with the Testcontainers image. The project targets Java 17.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

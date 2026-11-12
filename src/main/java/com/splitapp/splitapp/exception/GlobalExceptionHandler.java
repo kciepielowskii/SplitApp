@@ -119,19 +119,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "The data was changed by another request; please try again");
     }
 
-    @ExceptionHandler(Exception.class)
-    public ProblemDetail handleUnexpected(Exception exception) {
-        if (exception instanceof DataAccessException) {
-            // the message of a database exception contains the SQL and the values in it
-            log.error("Unexpected database error: {}, SQLState: {}",
-                    exception.getClass().getName(), sqlStateOf(exception));
-        } else {
-            log.error("Unexpected error", exception);
-        }
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",
-                "An unexpected error occurred.");
-    }
-
     @ExceptionHandler(EmailAlreadyUsedException.class)
     public ProblemDetail handleEmailAlreadyUsed(EmailAlreadyUsedException exception) {
         return problem(HttpStatus.CONFLICT, "Conflict", exception.getMessage());
@@ -165,6 +152,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessRuleException.class)
     public ProblemDetail handleBusinessRule(BusinessRuleException exception) {
         return problem(HttpStatus.UNPROCESSABLE_CONTENT, "Business rule violation", exception.getMessage());
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleUnexpected(Exception exception) {
+        if (exception instanceof DataAccessException) {
+            // the message of a database exception contains the SQL and the values in it
+            log.error("Unexpected database error: {}, SQLState: {}",
+                    exception.getClass().getName(), sqlStateOf(exception));
+        } else {
+            log.error("Unexpected error", exception);
+        }
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",
+                "An unexpected error occurred.");
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {
