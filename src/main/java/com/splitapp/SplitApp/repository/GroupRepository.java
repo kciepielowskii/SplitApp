@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface GroupRepository extends JpaRepository<ExpenseGroup, Long> {
@@ -19,4 +20,14 @@ public interface GroupRepository extends JpaRepository<ExpenseGroup, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select g from ExpenseGroup g where g.id = :id")
     Optional<ExpenseGroup> findByIdForUpdate(@Param("id") Long id);
+
+    // one query for the whole list: the group columns and the caller's role, newest group first
+    @Query("""
+            select g.id as id, g.groupName as groupName, g.groupDescription as groupDescription,
+                   m.role as role
+            from ExpenseGroup g join g.members m
+            where m.user.id = :userId
+            order by g.id desc
+            """)
+    List<GroupSummaryView> findSummariesByMemberUserId(@Param("userId") Long userId);
 }

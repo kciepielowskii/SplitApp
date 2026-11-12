@@ -5,6 +5,8 @@ import com.splitapp.SplitApp.dto.UserResponse;
 import com.splitapp.SplitApp.exception.EmailAlreadyUsedException;
 import com.splitapp.SplitApp.security.SecurityConfig;
 import com.splitapp.SplitApp.service.UserService;
+import com.splitapp.SplitApp.exception.UserNotFoundException;
+import com.splitapp.SplitApp.security.WithMockAppUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -14,6 +16,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -101,5 +105,28 @@ class UserControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Conflict"))
                 .andExpect(jsonPath("$.detail").value("The request conflicts with existing data"));
+    }
+
+    @Test
+    @WithMockAppUser
+    void shouldReturnTheLoggedInUserAndNotExposeThePassword() throws Exception {
+        when(userService.getUser(1L))
+                .thenReturn(new UserResponse(1L, "Jan", "Kowalski", "jan@example.com"));
+
+        mockMvc.perform(get("/users/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.email").value("jan@example.com"))
+                .andExpect(jsonPath("$.password").doesNotExist());
+    }
+
+    @Test
+    @WithMockAppUser
+    void shouldReturn404WhenTheLoggedInUserNoLongerExists() throws Exception {
+        when(userService.getUser(1L)).thenThrow(new UserNotFoundException("User not found"));
+
+        mockMvc.perform(get("/users/me"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("User not found"));
     }
 }

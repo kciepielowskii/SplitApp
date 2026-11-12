@@ -8,6 +8,7 @@ import com.splitapp.SplitApp.exception.GroupNotFoundException;
 import com.splitapp.SplitApp.exception.UserNotFoundException;
 import com.splitapp.SplitApp.repository.GroupRepository;
 import com.splitapp.SplitApp.repository.UserRepository;
+import com.splitapp.SplitApp.dto.GroupSummaryResponse;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -15,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
+
+import java.util.List;
 
 @Service
 @Validated
@@ -42,5 +45,13 @@ public class GroupService {
         return groupRepository.findWithMembersById(groupId)
                 .map(GroupResponse::from)
                 .orElseThrow(() -> new GroupNotFoundException("Group not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public List<GroupSummaryResponse> getMyGroups(@NotNull Long currentUserId) {
+        return groupRepository.findSummariesByMemberUserId(currentUserId).stream()
+                .map(view -> new GroupSummaryResponse(view.getId(), view.getGroupName(),
+                        view.getGroupDescription(), view.getRole()))
+                .toList();
     }
 }

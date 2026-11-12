@@ -2,10 +2,13 @@ package com.splitapp.SplitApp.controller;
 
 import com.splitapp.SplitApp.dto.RegisterUserRequest;
 import com.splitapp.SplitApp.dto.UserResponse;
+import com.splitapp.SplitApp.security.AppUserDetails;
 import com.splitapp.SplitApp.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,5 +25,10 @@ public class UserController {
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse register(@Valid @RequestBody RegisterUserRequest request) {
         return userService.register(request);
+    }
+
+    @GetMapping("/me")
+    public UserResponse getCurrentUser(@AuthenticationPrincipal AppUserDetails currentUser) {
+        return userService.getUser(currentUser.getId());
     }
 }

@@ -2,6 +2,7 @@ package com.splitapp.SplitApp.controller;
 
 import com.splitapp.SplitApp.dto.CreateGroupRequest;
 import com.splitapp.SplitApp.dto.GroupResponse;
+import com.splitapp.SplitApp.dto.GroupSummaryResponse;
 import com.splitapp.SplitApp.security.AppUserDetails;
 import com.splitapp.SplitApp.service.GroupService;
 import jakarta.validation.Valid;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/groups")
 @RequiredArgsConstructor
@@ -28,6 +31,12 @@ public class GroupController {
                                      @AuthenticationPrincipal AppUserDetails currentUser) {
         return groupService.createGroup(
                 request.groupName(), request.groupDescription(), currentUser.getId());
+    }
+
+    @GetMapping
+    public List<GroupSummaryResponse> getMyGroups(
+            @AuthenticationPrincipal AppUserDetails currentUser) {
+        return groupService.getMyGroups(currentUser.getId());
     }
 
     @GetMapping("/{groupId}")
