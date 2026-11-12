@@ -984,7 +984,7 @@ class ApplicationFlowIntegrationTest {
                         {"userId":%d}
                         """.formatted(second.id()))));
 
-        assertEquals(List.of(200, 403), statuses.stream().sorted().toList());
+        assertEquals(List.of(200, 403), statuses);
         assertEquals(1, ownerCount(owner, groupId));
     }
 

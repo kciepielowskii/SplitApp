@@ -65,13 +65,11 @@ curl -u jan@example.com:secret123 localhost:8080/groups
 ```
 
 Every `POST` must be sent with `Content-Type: application/json`, also the ones without a
-body (accept, decline, confirm, leave), otherwise the answer is 415 (or 401 when the request
-is not authenticated).
+body (accept, decline, confirm, leave), otherwise the answer is 415 (or 401 when an endpoint that needs credentials is called without them).
 
 ## API
 
-"Member" means a member of the group in the path. Every endpoint except `POST /users`
-needs HTTP Basic credentials.
+"Member" means a member of the group in the path. Every endpoint except `POST /users` and the API description (OpenAPI and Swagger UI) needs HTTP Basic credentials.
 
 | Method and path | Who | What |
 |---|---|---|
@@ -136,9 +134,7 @@ owner). So the history of someone who left stays consistent.
 produced before Spring MVC (401, 415). Database errors are mapped by SQLState and never
 expose the conflicting values: a unique violation is a 409, a value the database cannot
 store is a 400, and any other integrity violation (`CHECK`, foreign key) means a bug in the
-code and gives a 500. Convention: `409` is a conflict with current data or a concurrent
-change (retrying may help), `422` is a business rule that the request breaks, `400` is a
-malformed or invalid request. Messages are always in English
+code and gives a 500. Convention: `409` is a duplicate registration, a unique-constraint conflict or a concurrent change (retrying may help); `422` is any other business rule the request breaks, including a state that does not allow it (for example an invitation that is already pending or a payment that is already confirmed); `400` is a malformed or invalid request. Messages are always in English
 (`spring.web.locale-resolver=fixed`).
 
 **CSRF is off, deliberately.** The API is stateless and uses Basic auth, which browsers cache
@@ -186,6 +182,7 @@ account until the receiver confirms them.
   entries that involve a former member. There is no way to delete a group.
 - **404 and 403.** A group that does not exist answers 404 and one that exists but you do not
   belong to answers 403, so a response reveals which group ids exist.
+- **User ids in a request body.** An id that does not exist (in `paidById`, `participantIds`, `shares`, `senderId`, `receiverId`) answers 404, while an existing user who is not in the group answers 422, so a group member can find out which user ids exist.
 - **Payments.** The amount of a payment is not capped at the debt. Pending payments do not
   affect balances or suggestions. `paidAt` is the time the payment was recorded, not a date
   the user supplies.

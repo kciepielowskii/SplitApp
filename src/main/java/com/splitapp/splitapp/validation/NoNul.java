@@ -17,7 +17,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * The text must not contain the NUL character (U+0000). PostgreSQL cannot store it in a
- * text column, so without this check the request would fail with a 500.
+ * text column, so rejecting it here gives a clear message for the field instead of a
+ * database error.
  */
 @Documented
 @Constraint(validatedBy = NoNulValidator.class)
