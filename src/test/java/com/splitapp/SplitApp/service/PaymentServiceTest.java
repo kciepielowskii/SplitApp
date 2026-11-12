@@ -249,17 +249,62 @@ class PaymentServiceTest {
     }
 
     @Test
-    void shouldRejectDeletingPaymentWhenCallerIsOnlyTheReceiver() {
+    void shouldLetTheReceiverRejectAPendingPayment() {
         User owner = user(1L);
         User sender = user(2L);
         User receiver = user(3L);
         Payment payment = paymentBy(sender, sender, receiver, groupWithOwner(owner, sender, receiver));
         when(paymentRepository.findByIdAndGroupId(7L, GROUP_ID)).thenReturn(Optional.of(payment));
 
+        paymentService.deletePayment(GROUP_ID, 3L, 7L);
+
+        verify(paymentRepository).delete(payment);
+    }
+
+    @Test
+    void shouldRejectDeletingAConfirmedPaymentWhenCallerIsOnlyTheReceiver() {
+        User owner = user(1L);
+        User sender = user(2L);
+        User receiver = user(3L);
+        Payment payment = paymentBy(sender, sender, receiver, groupWithOwner(owner, sender, receiver));
+        payment.confirm();
+        when(paymentRepository.findByIdAndGroupId(7L, GROUP_ID)).thenReturn(Optional.of(payment));
+
         GroupAccessDeniedException ex = assertThrows(GroupAccessDeniedException.class,
                 () -> paymentService.deletePayment(GROUP_ID, 3L, 7L));
 
-        assertEquals("Only the author or the group owner can delete this payment", ex.getMessage());
+        assertEquals("Only the author, the receiver of a pending payment "
+                + "or the group owner can delete this payment", ex.getMessage());
+        verify(paymentRepository, never()).delete(any(Payment.class));
+    }
+
+    @Test
+    void shouldRejectDeletingPaymentWhenCallerIsOnlyTheSenderOfAPaymentTheReceiverRecorded() {
+        User owner = user(1L);
+        User sender = user(2L);
+        User receiver = user(3L);
+        Payment payment = paymentBy(receiver, sender, receiver, groupWithOwner(owner, sender, receiver));
+        when(paymentRepository.findByIdAndGroupId(7L, GROUP_ID)).thenReturn(Optional.of(payment));
+
+        assertThrows(GroupAccessDeniedException.class,
+                () -> paymentService.deletePayment(GROUP_ID, 2L, 7L));
+
+        verify(paymentRepository, never()).delete(any(Payment.class));
+    }
+
+    @Test
+    void shouldRejectDeletingAPendingPaymentWhenCallerIsNotInvolved() {
+        User owner = user(1L);
+        User sender = user(2L);
+        User receiver = user(3L);
+        User bystander = user(4L);
+        Payment payment = paymentBy(sender, sender, receiver,
+                groupWithOwner(owner, sender, receiver, bystander));
+        when(paymentRepository.findByIdAndGroupId(7L, GROUP_ID)).thenReturn(Optional.of(payment));
+
+        assertThrows(GroupAccessDeniedException.class,
+                () -> paymentService.deletePayment(GROUP_ID, 4L, 7L));
+
         verify(paymentRepository, never()).delete(any(Payment.class));
     }
 

@@ -560,24 +560,61 @@ class ApplicationFlowIntegrationTest {
     }
 
     @Test
-    void shouldAllowOnlyAuthorOrOwnerToDeleteAPayment() throws Exception {
+    void shouldAllowOnlyTheAuthorTheOwnerOrTheReceiverOfAPendingPaymentToDelete() throws Exception {
         TestUser owner = registerUser(uniqueEmail());
         TestUser friend = registerUser(uniqueEmail());
         TestUser third = registerUser(uniqueEmail());
+        TestUser bystander = registerUser(uniqueEmail());
         long groupId = createGroup(owner);
         addMember(groupId, owner, friend);
         addMember(groupId, owner, third);
-        long paymentId = createPayment(groupId, friend, third, "5.00");
-        String url = "/groups/%d/payments/%d".formatted(groupId, paymentId);
+        addMember(groupId, owner, bystander);
+        long pendingId = createPayment(groupId, friend, third, "5.00");
+        String pendingUrl = "/groups/%d/payments/%d".formatted(groupId, pendingId);
 
-        remove(third, url)
+        remove(bystander, pendingUrl)
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.title").value("Forbidden"));
-        remove(friend, url).andExpect(status().isNoContent());
+        // the receiver may reject a payment that is still waiting for confirmation
+        remove(third, pendingUrl).andExpect(status().isNoContent());
+
+        long confirmedId = createPayment(groupId, friend, third, "5.00");
+        String confirmedUrl = "/groups/%d/payments/%d".formatted(groupId, confirmedId);
+        send(third, confirmedUrl + "/confirm", "").andExpect(status().isOk());
+
+        // once confirmed, the receiver cannot take the confirmation back, the author can
+        remove(third, confirmedUrl)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"));
+        remove(friend, confirmedUrl).andExpect(status().isNoContent());
 
         fetch(owner, "/groups/%d/payments".formatted(groupId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void shouldLetTheReceiverRejectAPendingPaymentAndThenLeave() throws Exception {
+        TestUser owner = registerUser(uniqueEmail());
+        TestUser friend = registerUser(uniqueEmail());
+        long groupId = createGroup(owner);
+        addMember(groupId, owner, friend);
+        // the owner records a payment that the friend never agreed to
+        long paymentId = createPayment(groupId, owner, friend, "5.00");
+        String leaveUrl = "/groups/%d/leave".formatted(groupId);
+
+        send(friend, leaveUrl, "")
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.detail").value("You have pending payments in this group; "
+                        + "wait until they are confirmed or delete them"));
+
+        remove(friend, "/groups/%d/payments/%d".formatted(groupId, paymentId))
+                .andExpect(status().isNoContent());
+        send(friend, leaveUrl, "").andExpect(status().isNoContent());
+
+        fetch(owner, "/groups/%d".formatted(groupId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members.length()").value(1));
     }
 
     @Test
