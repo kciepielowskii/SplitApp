@@ -1,6 +1,7 @@
 package com.splitapp.splitapp.dto;
 
 import com.splitapp.splitapp.entity.ExpenseCategory;
+import com.splitapp.splitapp.validation.NoNul;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -13,7 +14,7 @@ import java.util.List;
 public record CreateExpenseRequest(
         @NotNull @DecimalMin("0.01") @Digits(integer = 8, fraction = 2) BigDecimal amount,
         @NotNull ExpenseCategory category,
-        @Size(max = 255) String description,
+        @Size(max = 255) @NoNul String description,
         @NotNull Long paidById,
         SplitType splitType,
         @Size(max = 100) List<@NotNull Long> participantIds,

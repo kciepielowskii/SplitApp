@@ -22,12 +22,16 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.sql.SQLException;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final String UNIQUE_VIOLATION = "23505";
+
+    // SQLState class 22: "data exception", the database refuses the value itself
+    private static final String DATA_EXCEPTION_CLASS = "22";
 
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
@@ -79,18 +83,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException exception) {
         // Do not log the exception message: the database includes the conflicting values in it.
-        org.hibernate.exception.ConstraintViolationException cause =
-                exception.getCause() instanceof org.hibernate.exception.ConstraintViolationException c
-                        ? c : null;
-        String constraint = cause != null && cause.getConstraintName() != null
+        String constraint = exception.getCause()
+                instanceof org.hibernate.exception.ConstraintViolationException cause
+                && cause.getConstraintName() != null
                 ? cause.getConstraintName()
                 : "unknown";
-        String sqlState = cause != null ? cause.getSQLState() : null;
+        String sqlState = sqlStateOf(exception);
 
         if (UNIQUE_VIOLATION.equals(sqlState)) {
             log.warn("Unique constraint violated: {}", constraint);
             return problem(HttpStatus.CONFLICT, "Conflict",
                     "The request conflicts with existing data");
+        }
+        if (sqlState != null && sqlState.startsWith(DATA_EXCEPTION_CLASS)) {
+            log.warn("The database refused a value, SQLState: {}", sqlState);
+            return problem(HttpStatus.BAD_REQUEST, "Invalid data",
+                    "The request contains data that cannot be stored");
         }
 
         log.error("Data integrity violation, constraint: {}, SQLState: {}", constraint, sqlState);
@@ -170,5 +178,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             name = node.getName();
         }
         return name;
+    }
+
+    // The SQLState lives on the driver's SQLException at the bottom of the cause chain, whatever
+    // exception type Hibernate and Spring wrapped it in.
+    private static String sqlStateOf(Throwable exception) {
+        String sqlState = null;
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql && sql.getSQLState() != null) {
+                sqlState = sql.getSQLState();
+            }
+            if (cause.getCause() == cause) {
+                break;
+            }
+        }
+        return sqlState;
     }
 }

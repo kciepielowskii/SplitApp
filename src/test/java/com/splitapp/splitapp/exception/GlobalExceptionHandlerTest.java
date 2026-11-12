@@ -22,6 +22,9 @@ import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.lang.reflect.Method;
 import java.sql.SQLException;
@@ -240,6 +243,33 @@ class GlobalExceptionHandlerTest {
         assertEquals("Invalid parameter", body.getTitle());
         assertEquals("Parameter 'groupId' has an invalid value", body.getDetail());
         assertFalse(body.getDetail().contains("abc-value"));
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void shouldAnswer400WhenTheDatabaseRefusesAValue(CapturedOutput output) {
+        DataIntegrityViolationException exception = new DataIntegrityViolationException(
+                "invalid byte sequence (secret-value)",
+                new org.hibernate.exception.DataException("bad value",
+                        new SQLException("invalid byte sequence for encoding", "22021")));
+
+        ProblemDetail result = handler.handleDataIntegrityViolation(exception);
+
+        assertEquals(HttpStatus.BAD_REQUEST.value(), result.getStatus());
+        assertEquals("Invalid data", result.getTitle());
+        assertEquals("The request contains data that cannot be stored", result.getDetail());
+        assertTrue(output.getOut().contains("SQLState: 22021"));
+        assertFalse(output.getOut().contains("secret-value"));
+    }
+
+    @Test
+    void shouldFindTheSqlStateWhateverTheWrapperType() {
+        DataIntegrityViolationException exception = new DataIntegrityViolationException(
+                "duplicate", new SQLException("duplicate key", "23505"));
+
+        ProblemDetail result = handler.handleDataIntegrityViolation(exception);
+
+        assertEquals(HttpStatus.CONFLICT.value(), result.getStatus());
     }
 
     @SuppressWarnings("unused")
