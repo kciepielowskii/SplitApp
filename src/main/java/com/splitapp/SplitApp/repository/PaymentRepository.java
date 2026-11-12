@@ -10,11 +10,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
-    List<Payment> findAllByGroupId(Long groupId);
-
-    List<Payment> findAllBySenderId(Long senderId);
-
-    List<Payment> findAllByReceiverId(Long receiverId);
 
     List<Payment> findAllByGroupIdOrderByPaidAtDescIdDesc(Long groupId);
 

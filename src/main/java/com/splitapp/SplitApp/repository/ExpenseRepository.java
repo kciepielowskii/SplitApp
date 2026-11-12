@@ -9,10 +9,6 @@ import java.util.Optional;
 
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
-    List<Expense> findAllByGroupId(Long groupId);
-
-    List<Expense> findAllByPaidById(Long userId);
-
     @EntityGraph(attributePaths = "splits")
     List<Expense> findAllByGroupIdOrderByCreatedAtDescIdDesc(Long groupId);
 
