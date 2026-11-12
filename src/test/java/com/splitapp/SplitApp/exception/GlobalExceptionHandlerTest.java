@@ -2,7 +2,6 @@ package com.splitapp.SplitApp.exception;
 
 import com.splitapp.SplitApp.dto.RegisterUserRequest;
 import com.splitapp.SplitApp.service.GroupService;
-import com.splitapp.SplitApp.exception.InvitationNotFoundException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
@@ -14,12 +13,15 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.lang.reflect.Method;
 import java.sql.SQLException;
@@ -203,6 +205,41 @@ class GlobalExceptionHandlerTest {
         assertEquals(403, result.getStatus());
         assertEquals("Forbidden", result.getTitle());
         assertEquals("You are not a member of this group", result.getDetail());
+    }
+
+    @Test
+    void shouldAnswerMalformedBodiesWithoutParserDetails() {
+        HttpMessageNotReadableException exception = new HttpMessageNotReadableException(
+                "JSON parse error: Unrecognized token 'secret-token'",
+                new MockHttpInputMessage(new byte[0]));
+
+        ResponseEntity<Object> response = handler.handleHttpMessageNotReadable(
+                exception, new HttpHeaders(), HttpStatus.BAD_REQUEST,
+                new ServletWebRequest(new MockHttpServletRequest()));
+
+        ProblemDetail body = (ProblemDetail) response.getBody();
+        assertEquals(HttpStatus.BAD_REQUEST.value(), body.getStatus());
+        assertEquals("Malformed request", body.getTitle());
+        assertEquals("The request body is missing or malformed", body.getDetail());
+        assertFalse(body.getDetail().contains("secret-token"));
+    }
+
+    @Test
+    void shouldNameTheParameterButNotTheValueOnTypeMismatch() throws Exception {
+        MethodParameter parameter = new MethodParameter(
+                GlobalExceptionHandlerTest.class.getDeclaredMethod("endpoint", Object.class), 0);
+        MethodArgumentTypeMismatchException exception = new MethodArgumentTypeMismatchException(
+                "abc-value", Long.class, "groupId", parameter, new IllegalArgumentException());
+
+        ResponseEntity<Object> response = handler.handleTypeMismatch(
+                exception, new HttpHeaders(), HttpStatus.BAD_REQUEST,
+                new ServletWebRequest(new MockHttpServletRequest()));
+
+        ProblemDetail body = (ProblemDetail) response.getBody();
+        assertEquals(HttpStatus.BAD_REQUEST.value(), body.getStatus());
+        assertEquals("Invalid parameter", body.getTitle());
+        assertEquals("Parameter 'groupId' has an invalid value", body.getDetail());
+        assertFalse(body.getDetail().contains("abc-value"));
     }
 
     @SuppressWarnings("unused")

@@ -38,7 +38,8 @@ class JsonContentTypeFilterTest {
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.title").value("Unsupported Media Type"))
-                .andExpect(jsonPath("$.status").value(415));
+                .andExpect(jsonPath("$.status").value(415))
+                .andExpect(jsonPath("$.instance").value(CONFIRM_URL));
 
         verifyNoInteractions(paymentService);
     }
@@ -70,7 +71,9 @@ class JsonContentTypeFilterTest {
     @WithAnonymousUser
     void shouldAnswer401BeforeCheckingTheContentTypeWhenNotLoggedIn() throws Exception {
         mockMvc.perform(post(CONFIRM_URL))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("Unauthorized"))
+                .andExpect(jsonPath("$.instance").value(CONFIRM_URL));
 
         verifyNoInteractions(paymentService);
     }
