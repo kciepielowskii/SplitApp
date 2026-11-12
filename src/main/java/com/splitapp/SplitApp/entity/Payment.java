@@ -84,6 +84,9 @@ public class Payment {
     }
 
     public void confirm() {
+        if (status != PaymentStatus.PENDING) {
+            throw new IllegalStateException("Payment is no longer pending");
+        }
         this.status = PaymentStatus.CONFIRMED;
     }
 
