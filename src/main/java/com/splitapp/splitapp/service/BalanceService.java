@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -29,7 +30,7 @@ public class BalanceService {
     private final PaymentRepository paymentRepository;
     private final GroupAccess groupAccess;
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public GroupBalancesResponse getBalances(@NotNull Long groupId, @NotNull Long currentUserId) {
         groupAccess.requireMember(groupId, currentUserId);
         ExpenseGroup group = groupRepository.findWithMembersById(groupId)

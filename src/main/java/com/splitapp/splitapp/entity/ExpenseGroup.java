@@ -107,11 +107,6 @@ public class ExpenseGroup {
         members.remove(member);
     }
 
-    /** The current owner becomes a regular member and the new owner takes over. */
-    public void transferOwnership(Long currentOwnerId, Long newOwnerId) {
-        transferOwnership(currentOwnerId, newOwnerId, () -> { });
-    }
-
     /**
      * Same as above, but {@code betweenSteps} runs after the current owner was demoted and
      * before the new owner is promoted. The caller can flush there, so that the database

@@ -132,7 +132,7 @@ class ExpenseGroupTest {
     void shouldTransferOwnership() {
         ExpenseGroup group = groupWithOwnerAndMember();
 
-        group.transferOwnership(1L, 2L);
+        group.transferOwnership(1L, 2L, () -> { });
 
         assertFalse(group.isOwner(1L));
         assertTrue(group.isOwner(2L));
@@ -156,7 +156,8 @@ class ExpenseGroupTest {
     void shouldRejectTransferringOwnershipToNonMember() {
         ExpenseGroup group = groupWithOwnerAndMember();
 
-        assertThrows(IllegalArgumentException.class, () -> group.transferOwnership(1L, 3L));
+        assertThrows(IllegalArgumentException.class, () ->
+                group.transferOwnership(1L, 3L, () -> { }));
         assertTrue(group.isOwner(1L));
     }
 
@@ -164,7 +165,8 @@ class ExpenseGroupTest {
     void shouldRejectTransferringOwnershipToTheSameUser() {
         ExpenseGroup group = groupWithOwnerAndMember();
 
-        assertThrows(IllegalArgumentException.class, () -> group.transferOwnership(1L, 1L));
+        assertThrows(IllegalArgumentException.class, () ->
+                        group.transferOwnership(1L, 1L, () -> { }));
         assertTrue(group.isOwner(1L));
     }
 
@@ -172,7 +174,8 @@ class ExpenseGroupTest {
     void shouldRejectTransferringOwnershipByNonOwner() {
         ExpenseGroup group = groupWithOwnerAndMember();
 
-        assertThrows(IllegalArgumentException.class, () -> group.transferOwnership(2L, 1L));
+        assertThrows(IllegalArgumentException.class, () ->
+                        group.transferOwnership(2L, 1L, () -> { }));
         assertTrue(group.isOwner(1L));
         assertFalse(group.isOwner(2L));
     }

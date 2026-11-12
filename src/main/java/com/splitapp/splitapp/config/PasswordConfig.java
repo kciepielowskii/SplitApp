@@ -15,7 +15,12 @@ public class PasswordConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new DelegatingPasswordEncoder(DEFAULT_ID,
-                Map.of(DEFAULT_ID, new BCryptPasswordEncoder()));
+        BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
+        DelegatingPasswordEncoder encoder =
+                new DelegatingPasswordEncoder(DEFAULT_ID, Map.of(DEFAULT_ID, bcrypt));
+        // a hash without a known prefix is checked as BCrypt instead of throwing
+        // IllegalArgumentException, which would surface as a 500 on a login attempt
+        encoder.setDefaultPasswordEncoderForMatches(bcrypt);
+        return encoder;
     }
 }
